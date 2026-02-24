@@ -1,26 +1,234 @@
-@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Righteous&display=swap");
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "DM Mono", monospace;
+  background: #000;
+  color: #fff;
+}
+
+a,
+p {
+  text-decoration: none;
+  text-transform: uppercase;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 0.9;
+  display: block;
+}
+
+/* Nav */
+nav {
+  position: fixed;
+  width: 100%;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 2;
+}
+
+.site-name a {
+  width: 4rem;
+  font-family: "Righteous", sans-serif;
+  font-size: 2rem;
+}
+
+.menu p {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.25rem;
+  background-color: #fff;
+  color: #000;
+  cursor: pointer;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.hero canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.hero__footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+/* Dissolve Section */
+.dissolve {
+  position: relative;
+  height: 400vh;
+  width: 100%;
+}
+
+.dissolve__sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.dissolve__canvas1,
+.dissolve__canvas2 {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.dissolve__canvas1 {
+  z-index: 2;
+}
+
+.dissolve__canvas2 {
+  z-index: 1;
+}
+
+.dissolve__text {
+  color: #0e0e0e;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  text-align: left;
+  padding: 2rem;
+  pointer-events: none;
+  margin-left: 6rem;
+}
+
+.dissolve__text-line {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.dissolve__text h2 {
+  color: #0e0e0e;
+  font-family: "Righteous", sans-serif;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+  line-height: 1.1;
+}
+
+.dissolve__text p {
+  color: #0e0e0e;
+  font-size: clamp(0.85rem, 1.2vw, 1.1rem);
+  font-weight: 400;
+  line-height: 1.6;
+  max-width: 36rem;
+  text-transform: none;
+
+  margin-bottom: 0.75rem;
+}
+
+/* Mask Text Section */
+.mask-text {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #111;
+  overflow: hidden;
+  cursor: default;
+  padding: 6rem 2rem;
+}
+
+.mask-text__og,
+.mask-text__mask {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 100%;
+}
+
+.mask-text__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+  width: 600px;
+  padding: 2rem;
+}
+
+.mask-text__og p,
+.mask-text__mask p {
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.mask-text__og p {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.mask-text__og span {
+  color: #aaa;
+}
+
+/* Sensory blur effect */
+.mask-text__sensory .blur-light {
+  filter: blur(1.5px);
+  opacity: 0.6;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.mask-text__sensory .blur-medium {
+  filter: blur(3px);
+  opacity: 0.4;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.mask-text__sensory .blur-heavy {
+  filter: blur(5px);
+  opacity: 0.25;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+.mask-text__mask {
+  position: absolute;
+  inset: 0;
+  background: #e8e4df;
+  mask-image: radial-gradient(circle, #000 50%, transparent 50%);
+  mask-size: var(--mask-size, 20px) var(--mask-size, 20px);
+  mask-repeat: no-repeat;
+  mask-position: var(--mask-x, -50px) var(--mask-y, -50px);
+  pointer-events: none;
+}
+
+.mask-text__mask p {
+  color: #1a1a1a;
+}
+
+.mask-text__mask span {
+  color: #c0392b;
 }
