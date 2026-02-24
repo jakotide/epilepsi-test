@@ -7,10 +7,7 @@ export default function Home() {
     <>
       <nav>
         <div className="site-name">
-          <a href="#">Epilepsi</a>
-        </div>
-        <div className="menu">
-          <p>Menu</p>
+          <a href="#">Epilepsiforbundet</a>
         </div>
       </nav>
 
