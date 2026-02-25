@@ -189,6 +189,32 @@ const fluidShader = `
     return texture2D(iPreviousFrame, fract(v/ur));
   }
 
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  float fbm(vec2 p) {
+    float val = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 4; i++) {
+      val += amp * noise(p);
+      p *= 2.0;
+      amp *= 0.5;
+    }
+    return val;
+  }
+
   float area(vec2 a, vec2 b, vec2 c) {
     float A = length(b-c), B = length(c-a), C = length(a-b), s = 0.5*(A+B+C);
     return sqrt(s*(s-A)*(s-B)*(s-C));
@@ -248,7 +274,19 @@ const fluidShader = `
         float falloff = exp(-brushSizeFactor*q*q*q);
         falloff = pow(falloff, 0.5);
 
+        // Break up brush edge with noise — cloudy, sparse wisps
+        vec2 noiseCoord = U * 0.015 + iTime * 0.3;
+        float brushNoise = fbm(noiseCoord);
+        // Erode the falloff: noise carves holes in the brush shape
+        falloff *= smoothstep(0.25, 0.55, brushNoise + falloff * 0.5);
+
         me.xyw += strengthFactor * falloff * vec3(m, 10.);
+
+        // Scatter the velocity direction slightly with noise
+        float angNoise = (noise(U * 0.02 + iTime * 0.5) - 0.5) * 0.6;
+        float cs = cos(angNoise);
+        float sn = sin(angNoise);
+        me.xy = vec2(me.x * cs - me.y * sn, me.x * sn + me.y * cs);
 
         if (velMagnitude < 2.0) {
           float distToCursor = length(U - mousePos);
@@ -309,12 +347,18 @@ const displayShader = `
 
     vec4 fluid = texture2D(iFluid, vUv);
     vec2 fluidVel = fluid.xy;
+    float fluidMag = length(fluidVel);
 
     float mr = min(iResolution.x, iResolution.y);
     vec2 uv = (fragCoord * 2.0 - iResolution.xy) / mr;
 
-    // Reduce fluid distortion for softer movement
+    // Fluid distortion — amplified by noise for cloudy warping
+    vec2 noiseOffset = vec2(
+      fbm(vUv * 4.0 + iTime * 0.05),
+      fbm(vUv * 4.0 + 50.0 + iTime * 0.05)
+    ) - 0.5;
     uv += fluidVel * (0.2 * uDistortionAmount);
+    uv += noiseOffset * fluidMag * 0.8;
 
     // Slower animation
     float d = -iTime * 0.2;
@@ -329,7 +373,7 @@ const displayShader = `
     float mixer2 = cos(uv.y * a) * 0.5 + 0.5;
     float mixer3 = sin(d + a) * 0.5 + 0.5;
 
-    // Push mixers hard toward center — foggy, sparse transitions
+    // Push mixers toward center — foggy, sparse transitions
     float fog = 0.75;
     mixer1 = mix(mixer1, 0.5, fog);
     mixer2 = mix(mixer2, 0.5, fog);
@@ -341,11 +385,14 @@ const displayShader = `
 
     col *= uColorIntensity;
 
-    // Cloudy FBM noise — slowly drifts over time
-    vec2 cloudUv = vUv * 2.5 + iTime * 0.03;
-    cloudUv += fluidVel * 0.15;
+    // Cloudy FBM noise — fluid-reactive, drifts with trail
+    vec2 cloudUv = vUv * 3.0 + iTime * 0.03;
+    cloudUv += fluidVel * 0.4;
     float cloud = fbm(cloudUv);
-    col = mix(col, col * (0.7 + cloud * 0.6), 0.5);
+    // Sparse breakup — where fluid is active, noise carves out wisps
+    float sparsity = fbm(vUv * 6.0 - fluidVel * 0.3 + iTime * 0.02);
+    float wispMask = smoothstep(0.3, 0.6, sparsity + fluidMag * 2.0);
+    col = mix(col, col * (0.6 + cloud * 0.8), wispMask * 0.6);
 
     // Fine film grain
     float grain = hash(vUv * iResolution + fract(iTime * 137.0)) - 0.5;

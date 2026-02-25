@@ -18,9 +18,36 @@ const fluidFragmentShader = `
   uniform vec2 uPrevMouse;
   uniform vec2 uResolution;
   uniform float uDecay;
+  uniform float uTime;
   uniform bool uIsMoving;
 
   varying vec2 vUv;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  float fbm(vec2 p) {
+    float val = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 4; i++) {
+      val += amp * noise(p);
+      p *= 2.0;
+      amp *= 0.5;
+    }
+    return val;
+  }
 
   void main() {
     vec4 prevState = texture2D(uPrevTrails, vUv);
@@ -39,10 +66,19 @@ const fluidFragmentShader = `
         projAlong = clamp(projAlong, 0.0, lineLength);
 
         vec2 closestPoint = uPrevMouse + projAlong * mouseDir;
-        float dist = length(vUv - closestPoint);
+
+        // Warp the distance field with noise so the shape itself is irregular
+        vec2 warpCoord = vUv * 18.0 + uTime * 0.3;
+        vec2 warp = vec2(fbm(warpCoord), fbm(warpCoord + 50.0)) - 0.5;
+        float dist = length(vUv - closestPoint + warp * 0.025);
 
         float lineWidth = 0.09;
         float intensity = smoothstep(lineWidth, 0.0, dist) * 0.3;
+
+        // Erode the brush with noise — sparse cloudy wisps
+        vec2 noiseCoord = vUv * 20.0 + uTime * 0.5;
+        float brushNoise = fbm(noiseCoord);
+        intensity *= smoothstep(0.3, 0.5, brushNoise + intensity * 1.0);
 
         newValue += intensity;
       }
@@ -58,10 +94,37 @@ const displayFragmentShader = `
   uniform sampler2D uBottomTexture;
   uniform vec2 uResolution;
   uniform float uDpr;
+  uniform float uTime;
   uniform vec2 uTopTextureSize;
   uniform vec2 uBottomTextureSize;
 
   varying vec2 vUv;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  float fbm(vec2 p) {
+    float val = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 4; i++) {
+      val += amp * noise(p);
+      p *= 2.0;
+      amp *= 0.5;
+    }
+    return val;
+  }
 
   vec2 getCoverUV(vec2 uv, vec2 textureSize) {
     if (textureSize.x < 1.0 || textureSize.y < 1.0) return uv;
@@ -77,14 +140,23 @@ const displayFragmentShader = `
   void main() {
     float fluid = texture2D(uFluid, vUv).r;
 
+    // Distort the fluid lookup with noise for cloudy, rough edges
+    vec2 noiseUv = vUv * 14.0 + uTime * 0.06;
+    float edgeNoise = (fbm(noiseUv) - 0.5) * 0.1;
+    fluid += edgeNoise * smoothstep(0.0, 0.08, fluid);
+
+    // Second layer of coarser noise for large-scale breakup
+    float coarseNoise = (fbm(vUv * 5.0 + uTime * 0.09) - 0.5) * 0.035;
+    fluid += coarseNoise * smoothstep(0.1, 0.15, fluid);
+
     vec2 topUV = getCoverUV(vUv, uTopTextureSize);
     vec2 bottomUV = getCoverUV(vUv, uBottomTextureSize);
 
     vec4 topColor = texture2D(uTopTexture, topUV);
     vec4 bottomColor = texture2D(uBottomTexture, bottomUV);
 
-    float threshold = 0.02;
-    float edgeWidth = 0.004 / uDpr;
+    float threshold = 0.03;
+    float edgeWidth = 0.009 / uDpr;
 
     float t = smoothstep(threshold, threshold + edgeWidth, fluid);
 
@@ -161,6 +233,7 @@ export default function Hero() {
         uPrevMouse: { value: prevMouse },
         uResolution: { value: new THREE.Vector2(size, size) },
         uDecay: { value: 0.97 },
+        uTime: { value: 0 },
         uIsMoving: { value: false },
       },
       vertexShader,
@@ -176,6 +249,7 @@ export default function Hero() {
           value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
         uDpr: { value: window.devicePixelRatio },
+        uTime: { value: 0 },
         uTopTextureSize: { value: topTextureSize },
         uBottomTextureSize: { value: bottomTextureSize },
       },
@@ -312,9 +386,14 @@ export default function Hero() {
     function animate() {
       animationId = requestAnimationFrame(animate);
 
+      const time = performance.now() * 0.001;
+
       if (isMoving && performance.now() - lastMoveTime > 50) {
         isMoving = false;
       }
+
+      trailsMaterial.uniforms.uTime.value = time;
+      displayMaterial.uniforms.uTime.value = time;
 
       const prevTarget = pingPongTargets[currentTarget];
       currentTarget = (currentTarget + 1) % 2;
