@@ -1,5 +1,5 @@
 {
-  "name": "cg-webgl-interactive-gradient",
+  "name": "codegrid-ironhill-scroll-animation",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -10,8 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "leva": "^0.10.0",
-    "three": "^0.178.0",
-    "vite": "^7.0.2"
+    "gsap": "^3.14.2",
+    "lenis": "^1.3.17",
+    "three": "^0.182.0",
+    "vite": "^7.3.1"
   }
 }

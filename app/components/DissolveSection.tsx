@@ -108,44 +108,36 @@ const coverFragmentShader = `
 
     float angle = atan(centeredUv.y, centeredUv.x);
 
-    float noiseScale = 6.0;
-    vec2 pixelatedUv = floor(vUv * uResolution / noiseScale) * noiseScale / uResolution;
-    float blockNoise = fbm(pixelatedUv * 100.0) * 0.15;
-
-    float angularNoise = fbm(vec2(angle * 5.0, 0.0)) * 0.15;
-
-    float totalNoise = blockNoise + angularNoise;
+    float smoothNoise = fbm(vUv * 8.0) * 0.1;
+    float angularNoise = fbm(vec2(angle * 3.0, dist * 2.0)) * 0.08;
+    float totalNoise = smoothNoise + angularNoise;
     float noisyDist = dist + totalNoise;
 
     float maxDist = length(vec2(aspect * 0.5, 0.5));
     float normalizedDist = noisyDist / maxDist;
 
+    // Before dissolve starts, show fully opaque — no glow, no edge
+    if (uDissolve < 0.001) {
+      gl_FragColor = vec4(texColor.rgb, texColor.a);
+      return;
+    }
+
     float dissolveThreshold = uDissolve * 1.5;
 
-    vec2 texelSize = 1.0 / uResolution;
-    float edge = sobel(uTexture, uv, texelSize);
+    float dissolveMask = smoothstep(dissolveThreshold - 0.12, dissolveThreshold, normalizedDist);
 
-    edge = pow(edge, 0.7) * 2.0;
-    edge = clamp(edge, 0.0, 1.0);
+    vec3 finalColor = texColor.rgb;
 
-    float dissolveMask = smoothstep(dissolveThreshold - 0.03, dissolveThreshold, normalizedDist);
+    // Soft glow halo at dissolve boundary
+    float glowWidth = 0.25 * (1.0 - uDissolve * 0.5);
+    float innerGlow = smoothstep(dissolveThreshold - glowWidth, dissolveThreshold - 0.02, normalizedDist)
+                    * smoothstep(dissolveThreshold + 0.05, dissolveThreshold - 0.02, normalizedDist);
+    float outerGlow = smoothstep(dissolveThreshold - glowWidth * 1.5, dissolveThreshold - 0.01, normalizedDist)
+                    * smoothstep(dissolveThreshold + 0.1, dissolveThreshold, normalizedDist);
 
-    vec3 edgeColor = vec3(1.0, 1.0, 1.0);
-
-    vec3 baseColor = mix(texColor.rgb, vec3(0.0), uGrayscale);
-    vec3 finalColor = baseColor;
-
-    float edgeGlowIntensity = uEdgeIntensity * 2.0;
-    float edgeGlow = edge * edgeGlowIntensity * (1.0 + uGrayscale * 3.0);
-    finalColor += edgeColor * edgeGlow * uEdgeBrightness;
-
-    float edgeZoneWidth = 0.15 * (1.0 - uDissolve) + 0.02;
-    float edgeZone = smoothstep(dissolveThreshold - edgeZoneWidth, dissolveThreshold - edgeZoneWidth + 0.04, normalizedDist) *
-                     smoothstep(dissolveThreshold + 0.02, dissolveThreshold - 0.02, normalizedDist);
-    float sparkle = hash(floor(vUv * uResolution / 4.0)) * edgeZone;
-
-    float edgeBrightness = (1.0 - uDissolve) * uEdgeBrightness * (1.0 + uGrayscale * 2.0);
-    finalColor += vec3(sparkle * 3.0 * edgeBrightness);
+    float glow = innerGlow * 0.7 + outerGlow * 0.3;
+    vec3 glowColor = vec3(1.0, 0.97, 0.95);
+    finalColor += glowColor * glow * uEdgeBrightness * 1.5;
 
     float alpha = dissolveMask * texColor.a;
 
@@ -352,53 +344,138 @@ const displayShader = `
     float mr = min(iResolution.x, iResolution.y);
     vec2 uv = (fragCoord * 2.0 - iResolution.xy) / mr;
 
-    // Fluid distortion — amplified by noise for cloudy warping
+    // --- Fluid distortion (mouse trail warps the UV) ---
     vec2 noiseOffset = vec2(
       fbm(vUv * 4.0 + iTime * 0.05),
       fbm(vUv * 4.0 + 50.0 + iTime * 0.05)
     ) - 0.5;
-    uv += fluidVel * (0.2 * uDistortionAmount);
-    uv += noiseOffset * fluidMag * 0.8;
+    uv += fluidVel * (0.2 * uDistortionAmount); // Trail distortion strength (tweak uDistortionAmount in config)
+    uv += noiseOffset * fluidMag * 0.8; // Noise-amplified warping around trail
 
-    // Slower animation
-    float d = -iTime * 0.2;
+    // --- Sine wave pattern ---
+    // Speed: controls how fast the pattern drifts (higher = faster)
+    float sineSpeed = 0.55;
+    // Intensity: controls how much the sine iterations compound (higher = more complex/intense pattern)
+    float sineIntensity = 0.9;
+    // Damping: how much later iterations fade out (higher = more damping, subtler pattern)
+    float sineDamping = 0.08;
+
+    float d = -iTime * sineSpeed;
     float a = 0.0;
     for (float i = 0.0; i < 8.0; ++i) {
-      a += cos(i - d - a * uv.x);
-      d += sin(uv.y * i + a);
+      float phase = i * sineIntensity + 1.0;
+      a += cos(phase * uv.x - d + a * 0.3) * (1.0 - i * sineDamping);
+      d += sin(phase * uv.y * 0.8 + a * 0.5 + i * 0.4) * (1.0 - i * (sineDamping * 0.75));
     }
-    d += iTime * 0.2;
+    d += iTime * sineSpeed;
 
-    float mixer1 = cos(uv.x * d) * 0.5 + 0.5;
-    float mixer2 = cos(uv.y * a) * 0.5 + 0.5;
-    float mixer3 = sin(d + a) * 0.5 + 0.5;
+    // --- Mixer contrast: how strongly the sines map to color blending ---
+    // Scale: multiplier on the sine output (higher = sharper color transitions)
+    float mixerScale = 0.6;
+    float mixer1 = cos(uv.x * d * 0.7 + uv.y * 0.3) * mixerScale + 0.5;
+    float mixer2 = sin(uv.y * a * 0.6 - uv.x * 0.2) * mixerScale + 0.5;
+    float mixer3 = cos(d * 0.5 + a * 0.5 + uv.x * uv.y * 0.1) * mixerScale + 0.5;
 
-    // Push mixers toward center — foggy, sparse transitions
-    float fog = 0.75;
+    // --- Fog: blends mixers toward 0.5 (0.0 = full contrast, 1.0 = flat/no pattern) ---
+    float fog = 0.08;
     mixer1 = mix(mixer1, 0.5, fog);
     mixer2 = mix(mixer2, 0.5, fog);
     mixer3 = mix(mixer3, 0.5, fog);
 
+    // --- Mixer clamping: prevents dark valleys from sequential color mixing ---
+    // Range is 0.0-1.0. Raising the min (e.g. 0.3) removes dark greys.
+    // Lowering the max (e.g. 0.7) removes bright peaks. Default unclamped would be 0.0-1.0.
+    float mixerMin = 0.2;
+    float mixerMax = 1.0;
+    mixer1 = clamp(mixer1, mixerMin, mixerMax);
+    mixer2 = clamp(mixer2, mixerMin, mixerMax);
+    mixer3 = clamp(mixer3, mixerMin, mixerMax);
+
+    // --- Color blending: sequential mix of 4 colors driven by mixer values ---
+    // mixer1 blends uColor1 → uColor2
+    // mixer2 blends result → uColor3
+    // mixer3 blends result → uColor4 (scaled by 0.4 so uColor4 is subtle)
     vec3 col = mix(uColor1, uColor2, mixer1);
     col = mix(col, uColor3, mixer2);
     col = mix(col, uColor4, mixer3 * 0.4);
 
+    // Overall brightness multiplier (tweak uColorIntensity in config)
     col *= uColorIntensity;
 
-    // Cloudy FBM noise — fluid-reactive, drifts with trail
-    vec2 cloudUv = vUv * 3.0 + iTime * 0.03;
-    cloudUv += fluidVel * 0.4;
-    float cloud = fbm(cloudUv);
-    // Sparse breakup — where fluid is active, noise carves out wisps
-    float sparsity = fbm(vUv * 6.0 - fluidVel * 0.3 + iTime * 0.02);
-    float wispMask = smoothstep(0.3, 0.6, sparsity + fluidMag * 2.0);
-    col = mix(col, col * (0.6 + cloud * 0.8), wispMask * 0.6);
+    // --- Noise overlay layer (cloudy FBM noise on top of gradient) ---
+    // vec2 cloudUv = vUv * 3.0 + iTime * 0.03;
+    // cloudUv += fluidVel * 0.4;
+    // float cloud = fbm(cloudUv);
+    // float sparsity = fbm(vUv * 6.0 - fluidVel * 0.3 + iTime * 0.02);
+    // float wispMask = smoothstep(0.3, 0.6, sparsity + fluidMag * 2.0);
+    // col = mix(col, col * (0.6 + cloud * 0.8), wispMask * 0.6);
 
-    // Fine film grain
-    float grain = hash(vUv * iResolution + fract(iTime * 137.0)) - 0.5;
-    col += grain * 0.07;
+    // --- Fine film grain overlay ---
+    // float grain = hash(vUv * iResolution + fract(iTime * 137.0)) - 0.5;
+    // col += grain * 0.07;
 
     gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+// Exit dissolve — top-to-bottom cloudy dissolve (same as Hero but flipped)
+const exitDissolveShader = `
+  uniform float uProgress;
+  uniform vec2 uResolution;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+
+  float Hash(vec2 p) {
+    vec3 p2 = vec3(p.xy, 1.0);
+    return fract(sin(dot(p2, vec3(37.1, 61.7, 12.4))) * 3758.5453123);
+  }
+
+  float noise(in vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f *= f * (3.0 - 2.0 * f);
+    return mix(
+      mix(Hash(i + vec2(0.0, 0.0)), Hash(i + vec2(1.0, 0.0)), f.x),
+      mix(Hash(i + vec2(0.0, 1.0)), Hash(i + vec2(1.0, 1.0)), f.x),
+      f.y
+    );
+  }
+
+  vec2 rot(vec2 p, float a) {
+    float c = cos(a), s = sin(a);
+    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+  }
+
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += amp * noise(p);
+      p = rot(p, 0.75) * 2.0 + 3.1;
+      amp *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    float aspect = uResolution.x / uResolution.y;
+    vec2 centeredUv = (uv - 0.5) * vec2(aspect, 1.0);
+
+    // Dissolve from top down: flip y so it comes from the top
+    float dissolveEdge = (1.0 - uv.y) - uProgress * 1.5;
+
+    float cloudNoise = fbm(centeredUv * 6.0) * 0.6;
+    float detailNoise = fbm(centeredUv * 14.0 + 50.0) * 0.3;
+    float fineNoise = fbm(centeredUv * 30.0 + 100.0) * 0.1;
+
+    float noiseValue = cloudNoise + detailNoise + fineNoise;
+    float d = dissolveEdge + noiseValue * 0.5;
+
+    float softEdge = 0.08;
+    float alpha = 1.0 - smoothstep(-softEdge, softEdge, d);
+
+    gl_FragColor = vec4(uColor, alpha);
   }
 `;
 
@@ -417,9 +494,9 @@ const gradientConfig = {
   trailLength: 0.8,
   stopDecay: 0.85,
   color1: "#fdeefcff",
-  color2: "#c4c4c4ff",
-  color3: "#e3d6e9ff",
-  color4: "#ebebebff",
+  color2: "#ebc5f0ff",
+  color3: "#f9ecffff",
+  color4: "#ffd7ffff",
   colorIntensity: 1.0,
   softness: 1.0,
 };
@@ -430,6 +507,14 @@ export default function DissolveSection() {
   const gradientRef = useRef<HTMLDivElement>(null);
   const groupsRef = useRef<(HTMLDivElement | null)[]>([]);
   const triggersRef = useRef<(HTMLDivElement | null)[]>([]);
+  const fusePathsRef = useRef<(SVGPathElement | null)[]>([]);
+  const tunnelWordsRef = useRef<HTMLDivElement>(null);
+  const exitCanvasRef = useRef<HTMLCanvasElement>(null);
+  const exitTextRef = useRef<HTMLDivElement>(null);
+  const exitCharsRef = useRef<(HTMLSpanElement | null)[]>([]);
+
+  const exitText = "Generaliserte anfall";
+  const exitChars = exitText.split("");
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -450,34 +535,40 @@ export default function DissolveSection() {
     container1.appendChild(renderer1.domElement);
 
     const geometry = new THREE.PlaneGeometry(2, 2);
-    const textureLoader = new THREE.TextureLoader();
-    let dissolveMaterial: THREE.ShaderMaterial | null = null;
 
-    textureLoader.load("/images/blue.jpg", (texture) => {
-      dissolveMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          uTexture: { value: texture },
-          uResolution: {
-            value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-          },
-          uImageResolution: {
-            value: new THREE.Vector2(texture.image.width, texture.image.height),
-          },
-          uDissolve: { value: 0.0 },
-          uCenter: { value: new THREE.Vector2(0.5, 0.5) },
-          uTime: { value: 0.0 },
-          uGrayscale: { value: 0.0 },
-          uEdgeIntensity: { value: 0.0 },
-          uEdgeBrightness: { value: 1.0 },
+    // Solid color texture instead of image
+    const solidCanvas = document.createElement("canvas");
+    solidCanvas.width = 4;
+    solidCanvas.height = 4;
+    const solidCtx = solidCanvas.getContext("2d")!;
+    solidCtx.fillStyle = "#1D1D1D";
+    solidCtx.fillRect(0, 0, 4, 4);
+    const solidTexture = new THREE.CanvasTexture(solidCanvas);
+    solidTexture.minFilter = THREE.LinearFilter;
+
+    const dissolveMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTexture: { value: solidTexture },
+        uResolution: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
-        vertexShader: coverVertexShader,
-        fragmentShader: coverFragmentShader,
-        transparent: true,
-      });
-
-      const mesh1 = new THREE.Mesh(geometry, dissolveMaterial);
-      scene1.add(mesh1);
+        uImageResolution: {
+          value: new THREE.Vector2(4, 4),
+        },
+        uDissolve: { value: 0.0 },
+        uCenter: { value: new THREE.Vector2(0.5, 0.5) },
+        uTime: { value: 0.0 },
+        uGrayscale: { value: 0.0 },
+        uEdgeIntensity: { value: 0.0 },
+        uEdgeBrightness: { value: 1.0 },
+      },
+      vertexShader: coverVertexShader,
+      fragmentShader: coverFragmentShader,
+      transparent: true,
     });
+
+    const mesh1 = new THREE.Mesh(geometry, dissolveMaterial);
+    scene1.add(mesh1);
 
     // --- Interactive gradient layer (behind dissolve) ---
     const gradientCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -562,6 +653,40 @@ export default function DissolveSection() {
       gradientDisplayMaterial,
     );
 
+    // --- Exit dissolve overlay ---
+    const exitCanvas = exitCanvasRef.current;
+    let exitRenderer: THREE.WebGLRenderer | null = null;
+    let exitMaterial: THREE.ShaderMaterial | null = null;
+    const exitScene = new THREE.Scene();
+    const exitCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    if (exitCanvas) {
+      exitRenderer = new THREE.WebGLRenderer({
+        canvas: exitCanvas,
+        alpha: true,
+        antialias: false,
+      });
+      exitRenderer.setSize(window.innerWidth, window.innerHeight);
+      exitRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const nextSectionColor = hexToRgb("#1D1D1D");
+      exitMaterial = new THREE.ShaderMaterial({
+        vertexShader: coverVertexShader,
+        fragmentShader: exitDissolveShader,
+        uniforms: {
+          uProgress: { value: 0 },
+          uResolution: {
+            value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          },
+          uColor: { value: new THREE.Vector3(...nextSectionColor) },
+        },
+        transparent: true,
+      });
+
+      const exitMesh = new THREE.Mesh(geometry, exitMaterial);
+      exitScene.add(exitMesh);
+    }
+
     let mouseX = 0;
     let mouseY = 0;
     let prevMouseX = 0;
@@ -616,8 +741,8 @@ export default function DissolveSection() {
 
       const st = ScrollTrigger.create({
         trigger: triggerEl,
-        start: "top 80%",
-        end: "top 20%",
+        start: "top bottom",
+        end: "top top",
         onEnter: () => tween.play(),
         onLeave: () => tween.reverse(),
         onEnterBack: () => tween.play(),
@@ -627,21 +752,153 @@ export default function DissolveSection() {
       scrollTriggers.push(st);
     });
 
+    // --- Tunnel line draw animation ---
+    const tunnelPaths = fusePathsRef.current.filter(
+      Boolean,
+    ) as SVGPathElement[];
+
+    if (tunnelPaths.length > 0) {
+      tunnelPaths.forEach((path) => {
+        const len = path.getTotalLength();
+        gsap.set(path, { strokeDasharray: len, strokeDashoffset: len });
+      });
+
+      // Get the fuse SVG container for the fade-out
+      const fuseSvg = tunnelPaths[0]?.closest("svg");
+
+      const fuseTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: wrapper,
+          start: "top bottom",
+          end: "14% top",
+          scrub: true,
+        },
+      });
+
+      // Draw lines: 0%-80% of timeline
+      tunnelPaths.forEach((path, i) => {
+        fuseTl.to(
+          path,
+          { strokeDashoffset: 0, ease: "none", duration: 0.8 },
+          i * 0.02,
+        );
+      });
+
+      // Tunnel words: appear one by one, then fade out together
+      const wordsContainer = tunnelWordsRef.current;
+      const wordSpans = wordsContainer?.querySelectorAll(
+        ".dissolve__tunnel-word",
+      );
+      if (wordsContainer && wordSpans && wordSpans.length > 0) {
+        gsap.set(wordSpans, { opacity: 0 });
+
+        wordSpans.forEach((span, i) => {
+          fuseTl.to(
+            span,
+            { opacity: 1, ease: "power2.out", duration: 0.3 },
+            0.45 + i * 0.16,
+          );
+        });
+
+        fuseTl.to(
+          wordSpans,
+          { opacity: 0, ease: "power2.in", duration: 0.2 },
+          0.92,
+        );
+      }
+
+      // Fade out SVG: last 20% of timeline
+      if (fuseSvg) {
+        fuseTl.to(
+          fuseSvg,
+          { opacity: 0, ease: "power2.in", duration: 0.2 },
+          0.8,
+        );
+      }
+
+      scrollTriggers.push(fuseTl.scrollTrigger!);
+    }
+
     function onScroll() {
       const progress = getScrollProgress();
 
-      // Dissolve completes in the first 30% of scroll
-      const dissolveProgress = Math.min(1, progress / 0.3);
+      // Dissolve starts at 12% (when fuse lines finish) and completes by 30%
+      const dissolveStart = 0.12;
+      const dissolveEnd = 0.3;
+      const dissolveProgress = Math.min(
+        1,
+        Math.max(0, (progress - dissolveStart) / (dissolveEnd - dissolveStart)),
+      );
 
       if (dissolveMaterial) {
         dissolveMaterial.uniforms.uDissolve.value = dissolveProgress;
         dissolveMaterial.uniforms.uGrayscale.value = Math.min(
           1.0,
-          dissolveProgress / 0.4,
+          dissolveProgress / 0.7,
         );
         dissolveMaterial.uniforms.uEdgeIntensity.value = dissolveProgress * 0.5;
         dissolveMaterial.uniforms.uEdgeBrightness.value =
-          1.0 - dissolveProgress;
+          1.5 * (1.0 - dissolveProgress);
+      }
+
+      // Exit dissolve: starts at 65%, fully covered by 80%
+      const exitStart = 0.65;
+      const exitEnd = 0.8;
+      const exitProgress = Math.min(
+        1.5,
+        Math.max(0, (progress - exitStart) / (exitEnd - exitStart)),
+      );
+
+      if (exitMaterial) {
+        exitMaterial.uniforms.uProgress.value = exitProgress;
+      }
+
+      // Exit text: fade in at 78%, lightning at 82%, fade out at 93%
+      const exitTextEl = exitTextRef.current;
+      const exitCharEls = exitCharsRef.current.filter(Boolean) as HTMLSpanElement[];
+      if (exitTextEl && exitCharEls.length > 0) {
+        const fadeInStart = 0.78;
+        const fadeInEnd = 0.81;
+        const lightningStart = 0.82;
+        const textFadeStart = 0.93;
+        const textFadeEnd = 0.98;
+
+        // Fade in whole container
+        if (progress < fadeInStart) {
+          exitTextEl.style.opacity = "0";
+        } else if (progress < fadeInEnd) {
+          const fadeIn = (progress - fadeInStart) / (fadeInEnd - fadeInStart);
+          exitTextEl.style.opacity = String(fadeIn);
+        } else if (progress > textFadeStart) {
+          const fadeOut = 1 - (progress - textFadeStart) / (textFadeEnd - textFadeStart);
+          exitTextEl.style.opacity = String(Math.max(0, fadeOut));
+        } else {
+          exitTextEl.style.opacity = "1";
+        }
+
+        // Trigger lightning animation once when crossing the threshold
+        if (progress >= lightningStart && !exitTextEl.dataset.triggered) {
+          exitTextEl.dataset.triggered = "1";
+          exitCharEls.forEach((char) => {
+            const delay = Math.random() * 0.3;
+            const duration = 0.2 + Math.random() * 0.15;
+            char.style.animationDelay = `${delay}s`;
+            char.style.animationDuration = `${duration}s`;
+            char.classList.add("lightning-char");
+          });
+          exitTextEl.classList.add("lightning-blink");
+        }
+
+        // Reset if scrolling back
+        if (progress < lightningStart && exitTextEl.dataset.triggered) {
+          delete exitTextEl.dataset.triggered;
+          exitCharEls.forEach((char) => {
+            char.classList.remove("lightning-char");
+            char.style.animationDelay = "";
+            char.style.animationDuration = "";
+          });
+          exitTextEl.classList.remove("lightning-blink");
+        }
       }
     }
 
@@ -651,9 +908,13 @@ export default function DissolveSection() {
 
       renderer1.setSize(w, h);
       gradientRenderer.setSize(w, h);
+      exitRenderer?.setSize(w, h);
 
       if (dissolveMaterial) {
         dissolveMaterial.uniforms.uResolution.value.set(w, h);
+      }
+      if (exitMaterial) {
+        exitMaterial.uniforms.uResolution.value.set(w, h);
       }
 
       fluidMaterial.uniforms.iResolution.value.set(w, h);
@@ -699,6 +960,11 @@ export default function DissolveSection() {
       previousFluidTarget = temp;
 
       frameCount++;
+
+      // Exit dissolve overlay
+      if (exitRenderer) {
+        exitRenderer.render(exitScene, exitCamera);
+      }
     }
 
     document.addEventListener("mousemove", onMouseMove);
@@ -717,12 +983,14 @@ export default function DissolveSection() {
 
       geometry.dispose();
       dissolveMaterial?.dispose();
+      exitMaterial?.dispose();
       fluidMaterial.dispose();
       gradientDisplayMaterial.dispose();
       fluidTarget1.dispose();
       fluidTarget2.dispose();
       renderer1.dispose();
       gradientRenderer.dispose();
+      exitRenderer?.dispose();
 
       if (container1.contains(renderer1.domElement)) {
         container1.removeChild(renderer1.domElement);
@@ -738,6 +1006,78 @@ export default function DissolveSection() {
       <div className="dissolve__sticky">
         <div className="dissolve__gradient" ref={gradientRef} />
         <div className="dissolve__canvas1" ref={canvas1Ref} />
+        <svg
+          className="dissolve__fuse"
+          viewBox="0 0 1000 1000"
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <defs>
+            {Array.from({ length: 16 }).map((_, i) => (
+              <radialGradient
+                key={`tg${i}`}
+                id={`tunnelGrad${i}`}
+                cx="50%"
+                cy="50%"
+                r="50%"
+              >
+                <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+                <stop offset="40%" stopColor="rgba(255,255,255,0.5)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0.08)" />
+              </radialGradient>
+            ))}
+          </defs>
+          {(() => {
+            const cx = 500;
+            const cy = 500;
+            const lines: React.ReactNode[] = [];
+            const count = 16;
+            for (let i = 0; i < count; i++) {
+              const angle = (i / count) * Math.PI * 2;
+              // Start from far outside the viewBox
+              const outerR = 720;
+              const sx = cx + Math.cos(angle) * outerR;
+              const sy = cy + Math.sin(angle) * outerR;
+              // End near center — varied so they don't form a perfect circle
+              const innerR = 8 - (i % 4) * 2;
+              const ex = cx + Math.cos(angle) * innerR;
+              const ey = cy + Math.sin(angle) * innerR;
+              // Control points create a slight curve inward
+              const midR = outerR * 0.45;
+              const angleOffset = 0.12;
+              const c1x = cx + Math.cos(angle + angleOffset) * midR;
+              const c1y = cy + Math.sin(angle + angleOffset) * midR;
+              const c2x = cx + Math.cos(angle - angleOffset) * (midR * 0.4);
+              const c2y = cy + Math.sin(angle - angleOffset) * (midR * 0.4);
+
+              lines.push(
+                <path
+                  key={i}
+                  ref={(el) => {
+                    fusePathsRef.current[i] = el;
+                  }}
+                  d={`M${sx.toFixed(1)},${sy.toFixed(1)} C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}`}
+                  fill="none"
+                  strokeWidth={1.2 - i * 0.02}
+                  stroke={`url(#tunnelGrad${i})`}
+                  strokeLinecap="round"
+                  opacity={0.6 + (i % 3) * 0.15}
+                />,
+              );
+            }
+            return lines;
+          })()}
+        </svg>
+        <div className="dissolve__tunnel-words" ref={tunnelWordsRef}>
+          <span className="dissolve__tunnel-word dissolve__tunnel-word--1">
+            stress
+          </span>
+          <span className="dissolve__tunnel-word dissolve__tunnel-word--2">
+            alkohol
+          </span>
+          <span className="dissolve__tunnel-word dissolve__tunnel-word--3">
+            søvn
+          </span>
+        </div>
         {/* Group 1 — left center */}
         <div
           className="dissolve__group dissolve__group--left"
@@ -767,11 +1107,10 @@ export default function DissolveSection() {
             prikking i en arm eller plutselige følelsesendringer — som intens
             frykt uten noen åpenbar grunn.
           </p>
-          <p>
-            Under et fokalt anfall kan hjernen sende signaler som forstyrrer
-            synet, hørselen og berøringssansen. Noen beskriver det som å se
+          {/*           <p>
+             Noen beskriver det som å se
             verden gjennom knust glass.
-          </p>
+          </p> */}
         </div>
 
         {/* Group 3 — center */}
@@ -784,18 +1123,35 @@ export default function DissolveSection() {
           <p>
             Andre opplever en intens følelse av ensomhet midt i et rom fullt av
             mennesker — en kobling som plutselig brytes, uten at noen rundt dem
-            forstår hva som skjer.
+            forstår hva som skjer. Noen beskriver det som å se verden gjennom
+            knust glass.
           </p>
-          <p>
+          {/*       <p>
             For mange varer det bare sekunder, men ettervirkningene kan prege
             resten av dagen. Utmattelse, forvirring og en følelse av å ha mistet
             tid er vanlige opplevelser etter et anfall.
-          </p>
+          </p> */}
+        </div>
+        <canvas className="dissolve__exit-canvas" ref={exitCanvasRef} />
+        <div className="dissolve__exit-text" ref={exitTextRef}>
+          <h2>
+            {exitChars.map((char, i) => (
+              <span
+                key={i}
+                ref={(el) => {
+                  exitCharsRef.current[i] = el;
+                }}
+              >
+                {char === " " ? "\u00A0" : char}
+              </span>
+            ))}
+          </h2>
         </div>
       </div>
 
-      {/* Scroll trigger sections — invisible, drive the text group animations */}
+      {/* Scroll trigger sections — invisible, drive animations */}
       <div className="dissolve__spacer" />
+      {<div className="dissolve__spacer--short" />}
       <div
         className="dissolve__trigger"
         ref={(el) => {

@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import { Instrument_Sans, Instrument_Serif } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
+import SmoothScroll from "./components/SmoothScroll";
 
-const instrumentSans = Instrument_Sans({
+const helvetica = localFont({
+  src: [
+    {
+      path: "./fonts/Helvetica.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Helvetica-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-serif",
-  weight: "400",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -25,8 +32,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${instrumentSans.variable} ${instrumentSerif.variable}`}>
-        {children}
+      <body className={helvetica.variable}>
+        <SmoothScroll>{children}</SmoothScroll>
       </body>
     </html>
   );

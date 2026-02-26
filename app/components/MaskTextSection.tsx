@@ -18,7 +18,7 @@ export default function MaskTextSection() {
     if (!section || !mask || !text1 || !text2) return;
 
     const maskSizeSmall = 20;
-    const maskSizeLarge = 250;
+    const maskSizeLarge = 450;
 
     function onMouseMove(e: MouseEvent) {
       const rect = section!.getBoundingClientRect();
@@ -68,17 +68,16 @@ export default function MaskTextSection() {
             men dypt merkbart for den som opplever det.
           </p>
           <p ref={text2Ref} className="mask-text__sensory">
-            Plutselig blir{" "}
-            <span className="blur-heavy">verden rundt deg</span> fjern.{" "}
-            <span className="blur-light">Lydene forsvinner</span> inn i en
-            tåke, ansikter blir{" "}
+            Plutselig blir <span className="blur-heavy">verden rundt deg</span>{" "}
+            fjern. <span className="blur-light">Lydene forsvinner</span> inn i
+            en tåke, ansikter blir{" "}
             <span className="blur-heavy">ugjenkjennelige</span>, og ordene{" "}
             <span className="blur-medium">mister sin mening</span>. Du er der,
             men <span className="blur-heavy">samtidig ikke</span>. Kroppen{" "}
             <span className="blur-light">reagerer</span> på signaler{" "}
             <span className="blur-medium">du ikke kontrollerer</span> — et
-            øyeblikk der{" "}
-            <span className="blur-heavy">sansene svikter deg</span>.
+            øyeblikk der <span className="blur-heavy">sansene svikter deg</span>
+            .
           </p>
         </div>
       </div>

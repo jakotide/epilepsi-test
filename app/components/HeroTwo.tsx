@@ -2,13 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
-
-const REVEAL_TEXT =
-  "Epilepsi er mer enn diagnoser og statistikk. Det er øyeblikk som plutselig endrer alt — synet, følelsene, bevisstheten. For å forstå hva epilepsi virkelig er, må vi se verden slik den oppleves innenfra.";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -74,21 +67,21 @@ const fluidFragmentShader = `
 
         vec2 closestPoint = uPrevMouse + projAlong * mouseDir;
 
-        // Warp the distance field with noise so the shape itself is irregular
+        // Warp the distance field with noise for irregular shape
         vec2 warpCoord = vUv * 18.0 + uTime * 0.3;
         vec2 warp = vec2(fbm(warpCoord), fbm(warpCoord + 50.0)) - 0.5;
         float dist = length(vUv - closestPoint + warp * 0.025);
 
-        // Core brush — same size as original
+        // Core brush
         float lineWidth = 0.09;
         float intensity = smoothstep(lineWidth, 0.0, dist) * 0.3;
 
-        // Erode the brush with noise — sparse cloudy wisps
+        // Erode with noise — sparse cloudy wisps
         vec2 noiseCoord = vUv * 20.0 + uTime * 0.5;
         float brushNoise = fbm(noiseCoord);
         intensity *= smoothstep(0.3, 0.5, brushNoise + intensity * 1.0);
 
-        // Soft outer dispersion — subtle gradient halo beyond the core
+        // Soft outer dispersion
         float outerGlow = smoothstep(0.18, 0.02, dist) * 0.06;
         vec2 disperseCoord = vUv * 12.0 + uTime * 0.15;
         outerGlow *= smoothstep(0.3, 0.6, fbm(disperseCoord));
@@ -97,30 +90,25 @@ const fluidFragmentShader = `
         newValue += intensity;
       }
 
-      // --- Small dots that spawn near the mouse and fade ---
+      // Small dots near the mouse
       float dotDist = length(vUv - uMouse);
       float dotRadius = 0.12;
       if (dotDist < dotRadius) {
-        // Tile space into cells for dot placement
         vec2 dotGrid = vUv * 200.0;
         vec2 dotCell = floor(dotGrid);
         vec2 dotLocal = fract(dotGrid) - 0.5;
 
-        // Time-varying seed so dots refresh
         float timeSlot = floor(uTime * 4.0);
         float cellRand = hash(dotCell + timeSlot);
         float cellRand2 = hash(dotCell * 1.7 + 31.0 + timeSlot);
 
-        // ~15% of cells get a dot
         if (cellRand > 0.85) {
           vec2 dotOffset = (vec2(hash(dotCell + 10.0 + timeSlot), hash(dotCell + 20.0 + timeSlot)) - 0.5) * 0.4;
           float dotSize = 0.12 + cellRand2 * 0.15;
           float d = length(dotLocal - dotOffset) / dotSize;
           float dot = smoothstep(1.0, 0.3, d);
 
-          // Stronger near cursor, fades outward
           float proximityFade = smoothstep(dotRadius, 0.01, dotDist);
-          // Pulse in and out within each time slot
           float phase = fract(uTime * 4.0);
           float timeFade = smoothstep(0.0, 0.25, phase) * smoothstep(1.0, 0.4, phase);
 
@@ -142,6 +130,9 @@ const displayFragmentShader = `
   uniform float uTime;
   uniform vec2 uTopTextureSize;
   uniform vec2 uBottomTextureSize;
+  uniform float uBottomScale;
+  uniform float uBottomOpacity;
+  uniform int uBlendMode;
 
   varying vec2 vUv;
 
@@ -195,108 +186,60 @@ const displayFragmentShader = `
     fluid += coarseNoise * smoothstep(0.1, 0.15, fluid);
 
     vec2 topUV = getCoverUV(vUv, uTopTextureSize);
+
+    // Scale sidetwo from center
     vec2 bottomUV = getCoverUV(vUv, uBottomTextureSize);
+    bottomUV = (bottomUV - 0.5) / uBottomScale + 0.5;
 
     vec4 topColor = texture2D(uTopTexture, topUV);
-    vec4 bottomColor = texture2D(uBottomTexture, bottomUV);
+
+    // Clamp to transparent if UV is out of bounds (scaled down)
+    vec4 bottomColor;
+    if (bottomUV.x < 0.0 || bottomUV.x > 1.0 || bottomUV.y < 0.0 || bottomUV.y > 1.0) {
+      bottomColor = vec4(0.0);
+    } else {
+      bottomColor = texture2D(uBottomTexture, bottomUV);
+    }
+
+    // Apply opacity
+    bottomColor.a *= uBottomOpacity;
 
     float threshold = 0.03;
     float edgeWidth = 0.009 / uDpr;
 
     float t = smoothstep(threshold, threshold + edgeWidth, fluid);
 
-    gl_FragColor = vec4(topColor.rgb, 1.0 - t);
-  }
-`;
-
-// Codegrid-style dissolve overlay shader
-const dissolveFragmentShader = `
-  uniform float uProgress;
-  uniform vec2 uResolution;
-  uniform vec3 uColor;
-  uniform float uSpread;
-  varying vec2 vUv;
-
-  float Hash(vec2 p) {
-    vec3 p2 = vec3(p.xy, 1.0);
-    return fract(sin(dot(p2, vec3(37.1, 61.7, 12.4))) * 3758.5453123);
-  }
-
-  float noise(in vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f *= f * (3.0 - 2.0 * f);
-    return mix(
-      mix(Hash(i + vec2(0.0, 0.0)), Hash(i + vec2(1.0, 0.0)), f.x),
-      mix(Hash(i + vec2(0.0, 1.0)), Hash(i + vec2(1.0, 1.0)), f.x),
-      f.y
-    );
-  }
-
-  vec2 rot(vec2 p, float a) {
-    float c = cos(a), s = sin(a);
-    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
-  }
-
-  float fbm(vec2 p) {
-    float v = 0.0;
-    float amp = 0.5;
-    for (int i = 0; i < 5; i++) {
-      v += amp * noise(p);
-      p = rot(p, 0.75) * 2.0 + 3.1;
-      amp *= 0.5;
+    // Blend modes: 0=normal, 1=screen, 2=lighten, 3=overlay
+    vec3 blended = bottomColor.rgb;
+    if (uBlendMode == 1) {
+      // Screen
+      blended = 1.0 - (1.0 - topColor.rgb) * (1.0 - bottomColor.rgb);
+    } else if (uBlendMode == 2) {
+      // Lighten
+      blended = max(topColor.rgb, bottomColor.rgb);
+    } else if (uBlendMode == 3) {
+      // Overlay
+      vec3 lo = 2.0 * topColor.rgb * bottomColor.rgb;
+      vec3 hi = 1.0 - 2.0 * (1.0 - topColor.rgb) * (1.0 - bottomColor.rgb);
+      blended = mix(lo, hi, step(0.5, topColor.rgb));
     }
-    return v;
-  }
 
-  void main() {
-    vec2 uv = vUv;
-    float aspect = uResolution.x / uResolution.y;
-    vec2 centeredUv = (uv - 0.5) * vec2(aspect, 1.0);
-
-    float dissolveEdge = uv.y - uProgress * 1.5;
-
-    // Large-scale cloudy shapes
-    float cloudNoise = fbm(centeredUv * 6.0) * 0.6;
-    // Medium detail
-    float detailNoise = fbm(centeredUv * 14.0 + 50.0) * 0.3;
-    // Fine wispy grain
-    float fineNoise = fbm(centeredUv * 30.0 + 100.0) * 0.1;
-
-    float noiseValue = cloudNoise + detailNoise + fineNoise;
-    float d = dissolveEdge + noiseValue * uSpread;
-
-    // Wide soft gradient edge instead of hard 1px line
-    float softEdge = 0.08;
-    float alpha = 1.0 - smoothstep(-softEdge, softEdge, d);
-
-    gl_FragColor = vec4(uColor, alpha);
+    vec3 color = mix(topColor.rgb, blended, t * bottomColor.a);
+    float alpha = mix(1.0, bottomColor.a, t);
+    alpha = max(alpha, 1.0 - t);
+    gl_FragColor = vec4(color, alpha);
   }
 `;
 
-function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return [r, g, b];
-}
-
-export default function Hero() {
+export default function HeroTwo() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dissolveCanvasRef = useRef<HTMLCanvasElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const wordsRef = useRef<(HTMLSpanElement | null)[]>([]);
-
-  const words = REVEAL_TEXT.split(" ");
 
   useEffect(() => {
     const section = sectionRef.current;
     const canvas = canvasRef.current;
-    const dissolveCanvas = dissolveCanvasRef.current;
-    if (!section || !canvas || !dissolveCanvas) return;
+    if (!section || !canvas) return;
 
-    // --- Fluid shader (existing) ---
     const renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -304,7 +247,7 @@ export default function Hero() {
       alpha: true,
     });
 
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(section.clientWidth, section.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     const scene = new THREE.Scene();
@@ -333,20 +276,19 @@ export default function Hero() {
     let currentTarget = 0;
 
     function createPlaceholderTexture(color: string) {
-      const placeholderCanvas = document.createElement("canvas");
-      placeholderCanvas.width = 512;
-      placeholderCanvas.height = 512;
-      const ctx = placeholderCanvas.getContext("2d")!;
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext("2d")!;
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, 512, 512);
-
-      const texture = new THREE.CanvasTexture(placeholderCanvas);
+      const texture = new THREE.CanvasTexture(c);
       texture.minFilter = THREE.LinearFilter;
       return texture;
     }
 
-    const topTexture = createPlaceholderTexture("#0000ff");
-    const bottomTexture = createPlaceholderTexture("#1D1D1D");
+    const topTexture = createPlaceholderTexture("#1d1d1d");
+    const bottomTexture = createPlaceholderTexture("#1d1d1d");
 
     const topTextureSize = new THREE.Vector2(1, 1);
     const bottomTextureSize = new THREE.Vector2(1, 1);
@@ -365,21 +307,26 @@ export default function Hero() {
       fragmentShader: fluidFragmentShader,
     });
 
+    const w = section.clientWidth;
+    const h = section.clientHeight;
+
     const displayMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uFluid: { value: null },
         uTopTexture: { value: topTexture },
         uBottomTexture: { value: bottomTexture },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
+        uResolution: { value: new THREE.Vector2(w, h) },
         uDpr: { value: window.devicePixelRatio },
         uTime: { value: 0 },
         uTopTextureSize: { value: topTextureSize },
         uBottomTextureSize: { value: bottomTextureSize },
+        uBottomScale: { value: 0.95 }, // < 1 = smaller, > 1 = bigger
+        uBottomOpacity: { value: 0.8 }, // 0-1
+        uBlendMode: { value: 2 }, // 0=normal, 1=screen, 2=lighten, 3=overlay
       },
       vertexShader,
       fragmentShader: displayFragmentShader,
+      transparent: true,
     });
 
     function loadImage(
@@ -391,21 +338,19 @@ export default function Hero() {
       img.crossOrigin = "Anonymous";
 
       img.onload = function () {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-        textureSizeVector.set(originalWidth, originalHeight);
+        textureSizeVector.set(img.width, img.height);
 
         const maxSize = 4096;
-        let newWidth = originalWidth;
-        let newHeight = originalHeight;
+        let newWidth = img.width;
+        let newHeight = img.height;
 
-        if (originalWidth > maxSize || originalHeight > maxSize) {
-          if (originalWidth > originalHeight) {
+        if (img.width > maxSize || img.height > maxSize) {
+          if (img.width > img.height) {
             newWidth = maxSize;
-            newHeight = Math.floor(originalHeight * (maxSize / originalWidth));
+            newHeight = Math.floor(img.height * (maxSize / img.width));
           } else {
             newHeight = maxSize;
-            newWidth = Math.floor(originalWidth * (maxSize / originalHeight));
+            newWidth = Math.floor(img.width * (maxSize / img.height));
           }
         }
 
@@ -429,7 +374,8 @@ export default function Hero() {
       img.src = url;
     }
 
-    loadImage("/images/pexels-pixabay-157661.jpg", topTextureSize, true);
+    loadImage("/images/side.png", topTextureSize, true);
+    loadImage("/images/sidetwo.png", bottomTextureSize, false);
 
     const planeGeometry = new THREE.PlaneGeometry(2, 2);
     const displayMesh = new THREE.Mesh(planeGeometry, displayMaterial);
@@ -445,61 +391,19 @@ export default function Hero() {
     renderer.clear();
     renderer.setRenderTarget(null);
 
-    // --- Dissolve overlay (codegrid-style) ---
-    const dissolveRenderer = new THREE.WebGLRenderer({
-      canvas: dissolveCanvas,
-      alpha: true,
-      antialias: false,
-    });
-    dissolveRenderer.setSize(window.innerWidth, window.innerHeight);
-    dissolveRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    const dissolveScene = new THREE.Scene();
-    const dissolveCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    const dissolveColor = hexToRgb("#1D1D1D");
-    const dissolveMaterial = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader: dissolveFragmentShader,
-      uniforms: {
-        uProgress: { value: 0 },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
-        uColor: { value: new THREE.Vector3(...dissolveColor) },
-        uSpread: { value: 0.5 },
-      },
-      transparent: true,
-    });
-
-    const dissolveMesh = new THREE.Mesh(planeGeometry, dissolveMaterial);
-    dissolveScene.add(dissolveMesh);
-
-    // --- Scroll tracking ---
-    let scrollProgress = 0;
-
-    function onScroll() {
-      const rect = section!.getBoundingClientRect();
-      const heroHeight = rect.height;
-      const maxScroll = heroHeight - window.innerHeight;
-      if (maxScroll <= 0) return;
-      const scrolled = -rect.top;
-      scrollProgress = Math.min(Math.max(0, (scrolled / maxScroll) * 2), 1.5);
-    }
-
     // --- Event handlers ---
     function onMouseMove(event: MouseEvent) {
-      const canvasRect = canvas!.getBoundingClientRect();
+      const rect = canvas!.getBoundingClientRect();
 
       if (
-        event.clientX >= canvasRect.left &&
-        event.clientX <= canvasRect.right &&
-        event.clientY >= canvasRect.top &&
-        event.clientY <= canvasRect.bottom
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
       ) {
         prevMouse.copy(mouse);
-        mouse.x = (event.clientX - canvasRect.left) / canvasRect.width;
-        mouse.y = 1 - (event.clientY - canvasRect.top) / canvasRect.height;
+        mouse.x = (event.clientX - rect.left) / rect.width;
+        mouse.y = 1 - (event.clientY - rect.top) / rect.height;
         isMoving = true;
         lastMoveTime = performance.now();
       } else {
@@ -510,19 +414,19 @@ export default function Hero() {
     function onTouchMove(event: TouchEvent) {
       if (event.touches.length > 0) {
         event.preventDefault();
-        const canvasRect = canvas!.getBoundingClientRect();
+        const rect = canvas!.getBoundingClientRect();
         const touchX = event.touches[0].clientX;
         const touchY = event.touches[0].clientY;
 
         if (
-          touchX >= canvasRect.left &&
-          touchX <= canvasRect.right &&
-          touchY >= canvasRect.top &&
-          touchY <= canvasRect.bottom
+          touchX >= rect.left &&
+          touchX <= rect.right &&
+          touchY >= rect.top &&
+          touchY <= rect.bottom
         ) {
           prevMouse.copy(mouse);
-          mouse.x = (touchX - canvasRect.left) / canvasRect.width;
-          mouse.y = 1 - (touchY - canvasRect.top) / canvasRect.height;
+          mouse.x = (touchX - rect.left) / rect.width;
+          mouse.y = 1 - (touchY - rect.top) / rect.height;
           isMoving = true;
           lastMoveTime = performance.now();
         } else {
@@ -531,74 +435,18 @@ export default function Hero() {
       }
     }
 
-    function onWindowResize() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+    function onResize() {
+      const newW = section!.clientWidth;
+      const newH = section!.clientHeight;
 
-      renderer.setSize(w, h);
-      dissolveRenderer.setSize(w, h);
-
-      displayMaterial.uniforms.uResolution.value.set(w, h);
+      renderer.setSize(newW, newH);
+      displayMaterial.uniforms.uResolution.value.set(newW, newH);
       displayMaterial.uniforms.uDpr.value = window.devicePixelRatio;
-      dissolveMaterial.uniforms.uResolution.value.set(w, h);
     }
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onWindowResize);
-
-    // --- Word-by-word text reveal ---
-    const wordEls = wordsRef.current.filter(Boolean) as HTMLSpanElement[];
-    const contentEl = contentRef.current;
-    let revealTrigger: ScrollTrigger | null = null;
-
-    if (wordEls.length > 0 && contentEl) {
-      revealTrigger = ScrollTrigger.create({
-        trigger: section,
-        start: "top =-160px",
-        end: "bottom bottom",
-        scrub: true,
-        onUpdate: (self) => {
-          const p = self.progress;
-          const total = wordEls.length;
-
-          // Words reveal in 30%-70% of hero scroll
-          const revealStart = 0.3;
-          const revealEnd = 0.7;
-          const fadeOutStart = 0.75;
-          const fadeOutEnd = 0.9;
-
-          const revealP = Math.max(
-            0,
-            Math.min(1, (p - revealStart) / (revealEnd - revealStart)),
-          );
-
-          wordEls.forEach((word, index) => {
-            const wp = index / total;
-            const nwp = (index + 1) / total;
-
-            let opacity = 0;
-            if (revealP >= nwp) {
-              opacity = 1;
-            } else if (revealP >= wp) {
-              opacity = (revealP - wp) / (nwp - wp);
-            }
-
-            word.style.opacity = String(opacity);
-          });
-
-          // Fade out entire container
-          if (p > fadeOutStart) {
-            const containerOpacity =
-              1 - (p - fadeOutStart) / (fadeOutEnd - fadeOutStart);
-            contentEl.style.opacity = String(Math.max(0, containerOpacity));
-          } else {
-            contentEl.style.opacity = "1";
-          }
-        },
-      });
-    }
+    window.addEventListener("resize", onResize);
 
     let animationId: number;
 
@@ -630,53 +478,28 @@ export default function Hero() {
 
       renderer.setRenderTarget(null);
       renderer.render(scene, camera);
-
-      // Dissolve overlay
-      dissolveMaterial.uniforms.uProgress.value = scrollProgress;
-      dissolveRenderer.render(dissolveScene, dissolveCamera);
     }
 
     animate();
 
     return () => {
       cancelAnimationFrame(animationId);
-      revealTrigger?.kill();
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onWindowResize);
+      window.removeEventListener("resize", onResize);
 
       pingPongTargets.forEach((t) => t.dispose());
       planeGeometry.dispose();
       trailsMaterial.dispose();
       displayMaterial.dispose();
-      dissolveMaterial.dispose();
       renderer.dispose();
-      dissolveRenderer.dispose();
     };
   }, []);
 
   return (
-    <section className="hero" ref={sectionRef}>
-      <div className="hero__sticky">
-        <h1 className="hero__title">Epilepsi</h1>
-        <canvas className="hero__fluid-canvas" ref={canvasRef} />
-        <canvas className="hero__dissolve-canvas" ref={dissolveCanvasRef} />
-        <div className="hero__content" ref={contentRef}>
-          <p>
-            {words.map((word, i) => (
-              <span
-                key={i}
-                ref={(el) => {
-                  wordsRef.current[i] = el;
-                }}
-              >
-                {word}{" "}
-              </span>
-            ))}
-          </p>
-        </div>
-      </div>
+    <section className="hero-two" ref={sectionRef}>
+      <img className="hero-two__bg" src="/images/side.png" alt="" />
+      <canvas className="hero-two__canvas" ref={canvasRef} />
     </section>
   );
 }

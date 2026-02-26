@@ -1,6 +1,8 @@
 import Hero from "./components/Hero";
 import DissolveSection from "./components/DissolveSection";
 import MaskTextSection from "./components/MaskTextSection";
+import DraggableMaskSection from "./components/DraggableMaskSection";
+import Footer from "./components/Footer";
 
 export default function Home() {
   return (
@@ -14,6 +16,8 @@ export default function Home() {
       <Hero />
       <DissolveSection />
       <MaskTextSection />
+      <DraggableMaskSection />
+      <Footer />
     </>
   );
 }
