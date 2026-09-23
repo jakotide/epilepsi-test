@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Hero from "./components/Hero";
 import DissolveSection from "./components/DissolveSection";
 import MaskTextSection from "./components/MaskTextSection";
@@ -10,6 +11,9 @@ export default function Home() {
       <nav>
         <div className="site-name">
           <a href="#">Epilepsiforbundet</a>
+        </div>
+        <div className="menu">
+          <Link href="/migrene">Migrene</Link>
         </div>
       </nav>
 

@@ -1,0 +1,38 @@
+.study {
+  position: relative;
+  height: 100svh;
+  min-height: 360px;
+  overflow: hidden;
+  background: #f8f5ef;
+  color: #66717c;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.viewport:active { cursor: grabbing; }
+.viewport canvas { position: absolute; inset: 0; outline-offset: -6px; }
+.fallback { position: absolute; width: min(90vw, 900px); height: 85%; object-fit: contain; left: 50%; top: 45%; transform: translate(-50%, -50%); }
+.viewport[data-loaded="true"] .fallback { display: none; }
+
+.controls {
+  position: absolute;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: .035em;
+}
+
+.controls button { padding: 12px 0; border: 0; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+.controls button:hover { color: #314a64; }
+.controls button:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; }
+.status { position: absolute; top: 25px; width: 100%; padding: 0 20px; text-align: center; font-size: 13px; }

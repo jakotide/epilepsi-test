@@ -1,0 +1,116 @@
+.journey {
+  --brain-blue: #486981;
+  --paper-color: #f8f5ef;
+  background: var(--paper-color);
+}
+
+.scrollChapter { position: relative; height: 1450svh; }
+
+.transitionStage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.portal {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.portalMask { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.hero {
+  --pointer-x: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--paper-color);
+}
+
+.painting {
+  grid-area: 1 / 1;
+  position: relative;
+  width: min(125vw, 130svh, 1500px);
+  aspect-ratio: 1440 / 1000;
+  pointer-events: none;
+  opacity: var(--paint-opacity, 1);
+}
+
+.paint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: multiply;
+  will-change: transform;
+}
+
+.farPaint {
+  transform: translate3d(calc(var(--pointer-x) * var(--interaction, 1) * -4px), 0, 0);
+}
+
+.nearPaint {
+  transform: translate3d(calc(var(--pointer-x) * var(--interaction, 1) * -8px), 0, 0);
+}
+
+.portrait {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 2;
+  width: min(78vw, 55svh, 560px);
+  transform: translate3d(calc(var(--pointer-x) * var(--interaction, 1) * 7px), 0, 0);
+  opacity: var(--portrait-opacity, 1);
+  will-change: transform;
+  pointer-events: none;
+  user-select: none;
+}
+
+.portraitImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: saturate(0.76);
+  mask-image: linear-gradient(to bottom, #000 83%, #000a 93%, transparent 100%);
+}
+
+.particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--dust-opacity, 1);
+}
+
+.distantDust { z-index: 1; }
+.nearDust { z-index: 4; }
+
+.foregroundPaint {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  /* Keep the original vertical placement while letting the wash span the page. */
+  height: min(136.5vw, 96.25svh, 980px);
+  opacity: var(--wash-opacity, 0.95);
+  pointer-events: none;
+  transform: translate3d(calc(var(--pointer-x) * var(--interaction, 1) * 10px), 0, 0);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paint, .portrait, .foregroundPaint { transform: none; will-change: auto; }
+}
