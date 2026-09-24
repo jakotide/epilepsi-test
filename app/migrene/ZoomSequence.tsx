@@ -17,6 +17,36 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+// Overlapping translucent paint edges hide the source crops without editing them.
+function paintMask(index: number) {
+  const mask = document.createElement("canvas");
+  mask.width = mask.height = 256;
+  const brush = mask.getContext("2d")!;
+  const pixels = brush.createImageData(256, 256);
+  const portrait = index >= 3;
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const nx = x / 255, ny = y / 255;
+      const dx = (nx - (index === 1 || index === 2 ? .56 : .5)) / (portrait ? .66 : .51);
+      const dy = (ny - .50) / (portrait ? .70 : .55);
+      const angle = Math.atan2(dy, dx);
+      const edge = Math.hypot(dx, dy)
+        + Math.sin(angle * 5 + index) * .045
+        + Math.sin(angle * 9 - index) * .025
+        + Math.sin(nx * 83 + Math.sin(ny * 41) * 3) * .012
+        + Math.sin(ny * 119 + nx * 53) * .008;
+      const coverage = .35 * (1 - smooth(.60, .91, edge))
+        + .40 * (1 - smooth(.76, 1.05, edge))
+        + .25 * (1 - smooth(.91, 1.16, edge));
+      const offset = (y * 256 + x) * 4;
+      pixels.data[offset] = pixels.data[offset + 1] = pixels.data[offset + 2] = 255;
+      pixels.data[offset + 3] = Math.round(coverage * 255);
+    }
+  }
+  brush.putImageData(pixels, 0, 0);
+  return mask;
+}
+
 export default function ZoomSequence({ stageRef }: { stageRef: RefObject<HTMLDivElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -71,6 +101,14 @@ export default function ZoomSequence({ stageRef }: { stageRef: RefObject<HTMLDiv
         }
       }
       context.globalAlpha = 1;
+      // A diluted paper wash passes over each blend, softening mismatched details.
+      const veil = Math.sin(blend * Math.PI) * .16;
+      if (veil > 0) {
+        context.globalCompositeOperation = "source-atop";
+        context.fillStyle = `rgba(248, 245, 239, ${veil})`;
+        context.fillRect(0, 0, width, height);
+        context.globalCompositeOperation = "source-over";
+      }
       canvas.dataset.view = String(views[index].file);
       canvas.dataset.progress = progress.toFixed(4);
     };
@@ -101,12 +139,16 @@ export default function ZoomSequence({ stageRef }: { stageRef: RefObject<HTMLDiv
         if (!brush) return;
         brush.drawImage(image, 0, 0);
         brush.globalCompositeOperation = "destination-in";
-        // Feather the edges into the surrounding paper at every zoom level.
+        const mask = paintMask(index);
+        brush.drawImage(mask, 0, 0, sprite.width, sprite.height);
+        mask.width = mask.height = 0;
+        // Broad white margins swallow the straight crop underneath the paint.
+        const feather = index < 3 ? .19 : .10;
         for (const vertical of [false, true]) {
           const gradient = brush.createLinearGradient(0, 0, vertical ? 0 : sprite.width, vertical ? sprite.height : 0);
           gradient.addColorStop(0, "transparent");
-          gradient.addColorStop(.07, "black");
-          gradient.addColorStop(.93, "black");
+          gradient.addColorStop(feather, "black");
+          gradient.addColorStop(1 - feather, "black");
           gradient.addColorStop(1, "transparent");
           brush.fillStyle = gradient;
           brush.fillRect(0, 0, sprite.width, sprite.height);

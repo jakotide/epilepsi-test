@@ -4,7 +4,7 @@
   background: var(--paper-color);
 }
 
-.scrollChapter { position: relative; height: 1450svh; }
+.scrollChapter { position: relative; height: 1090svh; }
 
 .transitionStage {
   position: sticky;

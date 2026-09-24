@@ -168,7 +168,7 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
       },
       onUpdate: sync,
     });
-    timeline.to(pose, { progress: 12, duration: 12, ease: "none" }, 0);
+    timeline.to(pose, { progress: 8.4, duration: 8.4, ease: "none" }, 0);
     timeline.to(pose, { shift: 1.18, duration: .45 }, 0);
     cards.forEach((card, index) => {
       timeline.fromTo(card, { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: .24 }, index + .06);
@@ -196,7 +196,7 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
     timeline.to(pose, { brainOpacity: 0, duration: .55 }, 5.08);
     timeline.to(pose, { backgroundOpacity: 0, duration: .45 }, 5.65);
     timeline.to(pose, { zoomOpacity: 1, duration: .38 }, 6.10);
-    timeline.to(pose, { zoomProgress: 1, duration: 5.15, ease: "none" }, 6.50);
+    timeline.to(pose, { zoomProgress: 1, duration: 1.65, ease: "none" }, 6.50);
     sync();
 
     const disposeModel = (object: THREE.Object3D) => object.traverse((child) => {
