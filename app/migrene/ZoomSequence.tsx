@@ -201,6 +201,12 @@ export default function ZoomSequence({ stageRef }: { stageRef: RefObject<HTMLDiv
     <section className={styles.sequence} aria-label="Fra iris til portrett">
       <canvas ref={canvasRef} className={styles.canvas} role="img" aria-label="Et malt øye som gradvis zoomer ut til et portrett av en kvinne." data-zoom-canvas />
       <p className={styles.description}>Fra det innerste blikket til hele mennesket.</p>
+      <div className={styles.intro} data-zoom-intro aria-hidden="true">
+        <div className={styles.textBox}>
+          <h2>Når verden kjennes annerledes</h2>
+          <p>Et lite skifte i blikket kan forandre hele opplevelsen. I neste del utforsker vi fire visuelle uttrykk.</p>
+        </div>
+      </div>
     </section>
   );
 }

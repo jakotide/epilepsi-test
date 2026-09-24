@@ -9,6 +9,7 @@ import ZoomSequence from "./ZoomSequence";
 
 gsap.registerPlugin(ScrollTrigger);
 const BrainWorld = dynamic(() => import("./BrainWorld"), { ssr: false });
+const ExperienceCanvas = dynamic(() => import("./ExperienceCanvas"), { ssr: false });
 
 function smooth(start: number, end: number, value: number) {
   const t = Math.max(0, Math.min(1, (value - start) / (end - start)));
@@ -197,6 +198,7 @@ export default function PortalTransition({ children }: { children: ReactNode }) 
           <ZoomSequence stageRef={stageRef} />
         </div>
       </section>
+      <ExperienceCanvas />
     </main>
   );
 }

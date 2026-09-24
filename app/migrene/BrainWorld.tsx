@@ -72,7 +72,7 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
       queueMicrotask(() => { if (alive) setStatus("En malt forhåndsvisning vises her."); });
     }
 
-    const pose = { yaw: .62, pitch: .44, distance: 8.5, shift: 0, progress: 0, mobileLift: 1.6, brainOpacity: 1, backgroundOpacity: 1, zoomOpacity: 0, zoomProgress: 0 };
+    const pose = { yaw: .62, pitch: .44, distance: 8.5, shift: 0, progress: 0, mobileLift: 1.6, brainOpacity: 1, backgroundOpacity: 1, zoomOpacity: 0, zoomProgress: 0, introOpacity: 0 };
     const animatedHighlight = material.uniforms.uHighlightCenter.value.clone() as THREE.Vector3;
     const stillHighlights = [new THREE.Vector3(), new THREE.Vector3(.75, .65, .92), new THREE.Vector3(-.35, .95, 1.1), new THREE.Vector3(.85, .05, .9)];
     const target = new THREE.Vector3(0, .12, 0);
@@ -136,6 +136,8 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
       root.dataset.backgroundOpacity = pose.backgroundOpacity.toFixed(3);
       if (stage) {
         stage.style.setProperty("--zoom-opacity", String(pose.zoomOpacity));
+        stage.style.setProperty("--zoom-intro-opacity", String(pose.introOpacity));
+        stage.querySelector("[data-zoom-intro]")?.setAttribute("aria-hidden", String(pose.introOpacity < .05));
         const zoomProgress = pose.zoomProgress.toFixed(5);
         if (stage.dataset.zoomProgress !== zoomProgress) {
           stage.dataset.zoomProgress = zoomProgress;
@@ -168,7 +170,7 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
       },
       onUpdate: sync,
     });
-    timeline.to(pose, { progress: 8.4, duration: 8.4, ease: "none" }, 0);
+    timeline.to(pose, { progress: 9.65, duration: 9.65, ease: "none" }, 0);
     timeline.to(pose, { shift: 1.18, duration: .45 }, 0);
     cards.forEach((card, index) => {
       timeline.fromTo(card, { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: .24 }, index + .06);
@@ -197,6 +199,8 @@ export default function BrainWorld({ journeyRef }: { journeyRef: RefObject<HTMLE
     timeline.to(pose, { backgroundOpacity: 0, duration: .45 }, 5.65);
     timeline.to(pose, { zoomOpacity: 1, duration: .38 }, 6.10);
     timeline.to(pose, { zoomProgress: 1, duration: 1.65, ease: "none" }, 6.50);
+    // Hold the complete portrait before making room for the next chapter's text.
+    timeline.to(pose, { introOpacity: 1, duration: .50 }, 8.45);
     sync();
 
     const disposeModel = (object: THREE.Object3D) => object.traverse((child) => {
