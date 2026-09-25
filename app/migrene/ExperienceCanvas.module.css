@@ -1,13 +1,11 @@
 .section { position: relative; min-height: 120svh; background: #f8f5ef; color: #43535c; }
 .stage { position: sticky; top: 0; height: 100svh; min-height: 640px; overflow: hidden; }
-.canvas { position: absolute; inset: 0; }
+.canvas { position: absolute; inset: 0; touch-action: pan-y; cursor: grab; }
+.canvas[data-dragging="true"] { cursor: grabbing; }
+.canvas:focus-visible { outline: 2px solid #486981; outline-offset: -5px; }
 .canvas canvas { display: block; width: 100%; height: 100%; }
 .panel { position: absolute; width: min(28vw, 330px); top: 50%; right: 8%; transform: translateY(-50%); }
-.copy { min-height: 180px; transition: opacity .3s ease, transform .45s ease; }
-.stage:has(.canvas[data-journey="depart"]) .copy,
-.stage:has(.canvas[data-journey="travel"]) .copy { opacity: 0; transform: translateY(7px); }
-.copy h2 { font: 400 clamp(32px, 3.2vw, 46px)/1.10 Georgia, 'Times New Roman', serif; letter-spacing: -.035em; text-wrap: balance; margin: 0 0 21px; }
-.copy p, .error { font-size: 13px; line-height: 1.8; color: #6c797e; text-transform: none; margin: 0; }
+.error { font-size: 13px; line-height: 1.8; color: #6c797e; margin: 0; }
 .choices { display: grid; margin-top: 24px; }
 .choices button { display: flex; align-items: center; gap: 15px; width: 100%; min-height: 51px; border: 0; border-bottom: 1px solid #718b9026; background: transparent; color: #6c797e; font: inherit; font-size: 14px; cursor: pointer; text-align: left; padding: 10px 8px; transition: background .2s, color .2s; }
 .choices button[aria-pressed="true"] { color: #365c65; background: #7ca6b10f; }
@@ -24,11 +22,8 @@
   .section { min-height: 110svh; }
   .stage { min-height: 760px; }
   .panel { top: auto; bottom: 5%; left: 8%; right: 8%; width: auto; transform: none; }
-  .copy { min-height: 0; }
-  .copy h2 { font-size: 30px; margin-bottom: 12px; }
-  .copy p { max-width: 380px; font-size: 12px; }
   .choices { grid-template-columns: 1fr 1fr; gap: 0 18px; margin-top: 16px; }
   .choices button { font-size: 12px; min-height: 45px; gap: 10px; }
   .compare { margin-top: 12px; }
 }
-@media (prefers-reduced-motion: reduce) { .panel button, .copy { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .panel button { transition: none; } }

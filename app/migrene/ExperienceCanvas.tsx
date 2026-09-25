@@ -4,12 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createExperienceScene, type ExperienceScene } from "./experienceScene";
 import styles from "./ExperienceCanvas.module.css";
 
-const studies = [
-  { label: "Uskarpt", title: "Når detaljene glir ut", text: "En kopp kaffe. En kjent form. Se hvordan uttrykket endrer seg når konturene blir mykere." },
-  { label: "Lyspunkter", title: "Lys mellom trærne", text: "Lys slipper gjennom løvverket. Se hvordan myke lyspunkter endrer rommet mellom trærne." },
-  { label: "Lysskjær", title: "Et lysere øyeblikk", text: "Det samme stille motivet, med et varmt lysskjær over papiret." },
-  { label: "Slør", title: "Bak et lett slør", text: "Et landskap som trekker seg tilbake i et mykt, lyst slør." },
-];
+const studies = ["Uskarpt", "Lyspunkter", "Lysskjær", "Slør"];
 
 export default function ExperienceCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -39,17 +34,13 @@ export default function ExperienceCanvas() {
   return (
     <section id="visuelle-uttrykk" className={styles.section} aria-label="Utforsk visuelle uttrykk" data-experience>
       <div className={styles.stage}>
-        <div ref={hostRef} className={styles.canvas} role="img" aria-label={displayed % 2 === 0 ? "En elfenbenshvit kopp malt i blågrå akvarell." : "Et lite landskap med trær malt i akvarell."} data-experience-canvas />
+        <div ref={hostRef} className={styles.canvas} role="group" tabIndex={0} aria-label={displayed % 2 === 0 ? "Dra sidelengs eller bruk piltastene for å rotere koppen 360 grader. Home tilbakestiller." : "Dra sidelengs eller bruk piltastene for å rotere skogen 360 grader. Home tilbakestiller."} data-experience-canvas />
         <div className={styles.panel}>
-          <div className={styles.copy} aria-live="polite" aria-atomic="true">
-            <h2>{studies[displayed].title}</h2>
-            <p>{studies[displayed].text}</p>
-          </div>
           <div className={styles.choices} role="group" aria-label="Velg et visuelt uttrykk">
             {studies.map((study, index) => (
-              <button key={study.label} type="button" aria-pressed={selected === index} disabled={!ready} onClick={() => select(index)}>
+              <button key={study} type="button" aria-pressed={selected === index} disabled={!ready} onClick={() => select(index)}>
                 <span className={styles.dot} aria-hidden="true" />
-                <span>{study.label}</span>
+                <span>{study}</span>
                 <span className={styles.number} aria-hidden="true">0{index + 1}</span>
               </button>
             ))}

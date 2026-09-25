@@ -18,16 +18,29 @@ To reproduce in Blender, execute `scripts/blender/create_watercolor_mug.py`,
 then `scripts/blender/refine_watercolor_mug.py`, with `__file__` set to each script's
 absolute path. The build creates a new scene; refinement targets its default name.
 
-The website uses `public/models/mug/watercolor-mug-turn.webp`, a transparent atlas
-of 13 Blender views from -12 to +12 degrees. A stronger window light exposes the
-ivory highlights. Three.js blends adjacent views for a slow, small turn and mouse
-response, preserving the exact painted finish. Soft painted shadows anchor its
-base. Motion pauses offscreen, in hidden tabs, and for reduced-motion preferences.
+The website uses `public/models/mug/lit-orbit/`: 72 transparent, 768px Blender views
+at five-degree intervals, supporting a full horizontal turn. Window light exposes
+the ivory highlights. Each angle includes a real Eevee area-light cast shadow,
+including the changing handle shadow, extracted against an unoccluded floor
+baseline and softened into the paper. Three.js blends adjacent views while
+retaining the original Eevee finish. The full set is 2.49 MB;
+only nearby angles load, with at most three requests in flight and eight textures
+retained (plus in-flight decodes). Superseded textures are disposed.
 
-To rebuild the views, execute `scripts/blender/render_mug_turn.py` after refinement,
-then run `node scripts/pack-mug-turn.cjs`. The Blender script restores the original
-scene transforms and render settings after exporting. The atlas is about 650 KB.
+Drag horizontally or use Left/Right to turn the cup. Home resets the view.
+Vertical touch gestures still scroll the page. Automatic sway stops after manual
+rotation and pauses offscreen, in hidden tabs, and for reduced-motion preferences.
+Manual rotation remains available with reduced motion enabled.
 
-This is a limited rendered turn, not unrestricted live 3D rotation.
-The live Eevee Shader to RGB material is not a glTF material and will need a
-Three.js shader adaptation to retain this appearance on a freely rotating model.
+To rebuild, execute `scripts/blender/render_mug_shadow_orbit.py` after refinement,
+then run `node scripts/pack-mug-shadow-orbit.cjs`. Optional START/END globals select
+a render batch; the first batch also renders the floor baseline. The script
+creates a separate studio saved as `watercolor-mug-with-shadow.blend`, preserving
+the original mug scene. Shadow extraction ignores unlit baseline pixels and uses
+a smooth falloff to avoid a rectangular floor boundary. Older orbits and the
+thirteen-view atlas are retained but no longer requested by the site.
+
+This is a rendered turntable with a fixed elevation, not unrestricted live 3D
+orbit. The grove similarly combines rendered angles with rotating depth layers.
+Eevee Shader to RGB is not a glTF material; free camera orbit would require a
+Three.js shader adaptation to retain the painted appearance.
