@@ -35,7 +35,7 @@ export function createGroveLayers(group: THREE.Group, onReady: () => void, onErr
     const tree=file.startsWith("woodland/");
     if(file.startsWith("woodland/")&&!orbits.has(file)){
       const tree=file.split("/").pop();
-      orbits.set(file,createPaintedOrbit(index=>`/models/grove/woodland/orbit/${tree}/view-${String(index).padStart(2,"0")}.webp`,()=>{if(ready)onReady();},onError));
+      orbits.set(file,createPaintedOrbit(index=>`/models/grove/woodland/orbit/${tree}/view-${String(index).padStart(2,"0")}.webp`,()=>{if(ready)onReady();},onError,4));
     }
     const material = new THREE.ShaderMaterial({
       transparent:true,depthWrite:false,depthTest:false,toneMapped:false,side:THREE.DoubleSide,
@@ -54,8 +54,8 @@ export function createGroveLayers(group: THREE.Group, onReady: () => void, onErr
     layer("woodland/birch-ink",3.60,5.40,-1.88,-1.45,1.03,.97,.3,.012),
     layer("woodland/birch-blue",3.25,4.875,-.14,-1.45,-2.12,.97,4.2,.018),
     layer("woodland/birch-gold",3.30,4.95,1.87,-1.45,1.18,.97,1.5,.014),
-    layer("woodland/birch-ink",2.90,4.35,-1.73,-1.45,-1.28,.97,2.1,.019),
-    layer("woodland/birch-gold",3.05,4.575,1.65,-1.45,-1.31,.97,3.1,.019),
+    layer("woodland/birch-silver",3.10,4.65,-1.73,-1.45,-1.28,.97,2.1,.019),
+    layer("woodland/birch-rose",3.25,4.875,1.65,-1.45,-1.31,.97,3.1,.019),
   ];
   // Crossed painted tufts occupy fixed patches on the ground. They retain their
   // scene headings instead of following the camera or sliding with mouse input.

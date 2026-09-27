@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createExperienceScene, type ExperienceScene } from "./experienceScene";
 import styles from "./ExperienceCanvas.module.css";
 
-const studies = ["Uskarpt", "Lyspunkter", "Lysskjær", "Slør"];
+const studies = ["Uskarpt", "Lyspunkter", "Bukett", "Slør"];
 
 export default function ExperienceCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -34,7 +34,7 @@ export default function ExperienceCanvas() {
   return (
     <section id="visuelle-uttrykk" className={styles.section} aria-label="Utforsk visuelle uttrykk" data-experience>
       <div className={styles.stage}>
-        <div ref={hostRef} className={styles.canvas} role="group" tabIndex={0} aria-label={displayed % 2 === 0 ? "Dra sidelengs eller bruk piltastene for å rotere koppen 360 grader. Home tilbakestiller." : "Dra sidelengs eller bruk piltastene for å rotere skogen 360 grader. Home tilbakestiller."} data-experience-canvas />
+        <div ref={hostRef} className={styles.canvas} role="group" tabIndex={0} aria-label={displayed === 2 ? "Dra sidelengs eller bruk piltastene for å rotere buketten 360 grader. Home tilbakestiller." : displayed === 0 ? "Dra sidelengs eller bruk piltastene for å rotere koppen 360 grader. Home tilbakestiller." : "Dra sidelengs eller bruk piltastene for å rotere skogen 360 grader. Home tilbakestiller."} data-experience-canvas />
         <div className={styles.panel}>
           <div className={styles.choices} role="group" aria-label="Velg et visuelt uttrykk">
             {studies.map((study, index) => (

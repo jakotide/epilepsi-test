@@ -2,17 +2,21 @@
 
 The current website uses the airy woodland study in `woodland/`, inspired by
 the supplied image of tall birch-like trunks, open branches, and sparse foliage.
-Three original branching meshes carry distinct palettes: dark ink and warm birch,
-cobalt/turquoise, and sunlit gold/moss. Small cupped leaves add stronger green,
+Five original branching meshes carry distinct palettes: dark ink and warm birch,
+cobalt/turquoise, sunlit gold/moss, silver/sage, and rose/ochre. Small cupped leaves add stronger green,
 yellow, and rose-pink accents, with different color distributions on each tree. Materials
 copy the mug's rose-derived Eevee shader, retaining its stepped light washes,
 distorted pigment boundaries, and screen-space paper fibers. Bark adds a
 second layer of broad, uneven pigment pools. The silhouettes are independently
 designed: a crooked spreading birch, a straight blue trunk with high branches,
-and a leaning gold tree with a low blossom fork. Branches extend in depth so the
+and a leaning gold tree with a low blossom fork. The added silver tree has slender,
+upright forks and sparse cool foliage; the rose tree has a low Y-shaped trunk,
+spreading boughs, and pink blossom clusters. No tree in the clearing is duplicated.
+Branches extend in depth so the
 side and back views retain volume.
 
-Editable file: `woodland/watercolor-woodland.blend`.
+Editable file: `woodland/watercolor-woodland-five-originals.blend`.
+The previous three-tree study remains in `woodland/watercolor-woodland.blend`.
 Build with `scripts/blender/create_watercolor_woodland.py` in Blender, with
 `__file__` set to its absolute path. With that woodland scene active, execute
 `scripts/blender/render_woodland_orbit.py`, then run
@@ -22,9 +26,17 @@ The script creates a separate scene and preserves the earlier study and sources.
 It requires the mug scene/material to be loaded. Individual exports are transparent;
 the final studio preview includes the original paper world.
 
+To extend an existing three-tree study, activate it and execute
+`scripts/blender/extend_watercolor_woodland.py` with its absolute `__file__`.
+This creates a separate five-tree scene, reuses the three originals unchanged,
+and builds two new silhouettes using `scripts/blender/woodland_geometry.py`.
+Render just the additions with `KINDS=[3,4]`, then package them with
+`node scripts/pack-woodland-orbit.cjs birch-silver birch-rose`.
+
 Each tree has 72 transparent 512 x 768 WebP views (five-degree spacing), about
-11.72 MB for all three complete turns. Only nearby angles load on demand, with
-six textures retained per tree. Ghost trees share the same texture caches.
+18.91 MB for all five complete turns. Only nearby angles load on demand, with
+four textures retained per tree (20 total), keeping the working set close to
+the previous three-design cache. Every tree has its own rendered turn.
 Dragging orbits the camera around five fixed tree anchors in a roughly circular
 clearing while blending matching Blender angles. Tree image planes face the
 orbit direction without moving their roots. Depth order and pigment opacity

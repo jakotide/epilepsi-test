@@ -1,8 +1,9 @@
 const sharp=require('sharp'),fs=require('node:fs/promises'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 (async()=>{
-  let bytes=0;
-  for(const tree of ['birch-ink','birch-blue','birch-gold']){
+  let bytes=0,frames=0;
+  const names=process.argv.slice(2);
+  for(const tree of names.length?names:['birch-ink','birch-blue','birch-gold','birch-silver','birch-rose']){
     const output=path.join(root,'public/models/grove/woodland/orbit',tree);
     await fs.mkdir(output,{recursive:true});
     for(let index=0;index<72;index++){
@@ -10,7 +11,8 @@ const root=path.resolve(__dirname,'..');
       const info=await sharp(path.join(root,'assets/grove/woodland/orbit',tree,name+'.png'))
         .webp({quality:90,alphaQuality:100,effort:5}).toFile(path.join(output,name+'.webp'));
       bytes+=info.size;
+      frames++;
     }
   }
-  console.log({frames:216,bytes});
+  console.log({frames,bytes});
 })().catch(e=>{console.error(e);process.exitCode=1});

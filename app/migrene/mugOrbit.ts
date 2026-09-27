@@ -5,8 +5,7 @@ export function createMugOrbit(onLoad: () => void, onError: () => void) {
   return createPaintedOrbit(index=>`/models/mug/lit-orbit/mug-${String(index).padStart(2,"0")}.webp`,onLoad,onError,8);
 }
 
-export function createPaintedOrbit(url: (index:number)=>string, onLoad:()=>void, onError:()=>void, limit=6) {
-  const count = 72;
+export function createPaintedOrbit(url: (index:number)=>string, onLoad:()=>void, onError:()=>void, limit=6, count=72) {
   const cache = new Map<number, THREE.Texture>();
   const pending = new Set<number>(), failed = new Set<number>();
   const loader = new THREE.TextureLoader();
@@ -48,7 +47,7 @@ export function createPaintedOrbit(url: (index:number)=>string, onLoad:()=>void,
     get ready() { return cache.size > 0; },
     get size() { return cache.size; },
     sample(angle: number) {
-      wanted = wrap(angle / 5); pump();
+      wanted = wrap(angle / (360 / count)); pump();
       const low = Math.floor(wanted), high = wrap(low + 1);
       let a = low, b = high, blend = wanted - low;
       if (!cache.has(a) || !cache.has(b)) {
