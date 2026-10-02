@@ -1,4 +1,4 @@
-.section { position: relative; min-height: 120svh; background: #f8f5ef; color: #43535c; }
+.section { position: relative; min-height: 120svh; background: #f3f1f7; color: #43535c; }
 .stage { position: sticky; top: 0; height: 100svh; min-height: 640px; overflow: hidden; }
 .canvas { position: absolute; inset: 0; touch-action: pan-y; cursor: grab; }
 .canvas[data-dragging="true"] { cursor: grabbing; }

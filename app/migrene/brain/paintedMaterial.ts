@@ -23,7 +23,7 @@ export function createPaintedMaterial(paper: THREE.Texture) {
     uniforms: {
       uPaper: { value: paper },
       uResolution: { value: new THREE.Vector2(1, 1) },
-      uPaperColor: { value: new THREE.Color("#f8f5ef") },
+      uPaperColor: { value: new THREE.Color("#f3f1f7") },
       uLight: { value: new THREE.Vector3(-3, 5, 4).normalize() },
       uRose: { value: new THREE.Color("#b9787b") },
       uCool: { value: new THREE.Color("#8898ae") },

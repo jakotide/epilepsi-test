@@ -23,7 +23,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   renderer.domElement.setAttribute("aria-hidden", "true");
   host.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#f8f5ef");
+  scene.background = new THREE.Color("#f3f1f7");
   const camera = new THREE.PerspectiveCamera(35, 1, .1, 60);
   const groveCamera = new THREE.PerspectiveCamera(35, 1, .1, 60);
   const journeyCamera = new THREE.PerspectiveCamera();
@@ -114,7 +114,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   const neutral = new THREE.DataTexture(new Uint8Array([210,210,210,255]),1,1);neutral.needsUpdate=true;
   let paper: THREE.Texture | undefined;
   const post = new THREE.ShaderMaterial({
-    uniforms: { uScene:{value:target.texture},uSoftScene:{value:softTarget.texture},uTime:{value:0},uAuraReveal:{value:1},uAuraMotion:{value:0},uAuraTurn:{value:0}, uResolution:{value:new THREE.Vector2(1,1)},uPortrait:{value:0},uPaper:{value:neutral},uPaperColor:{value:new THREE.Color("#f8f5ef")},uStrength:{value:1},uMode:{value:0},uFade:{value:1},uEffectVisibility:{value:1} },
+    uniforms: { uScene:{value:target.texture},uSoftScene:{value:softTarget.texture},uTime:{value:0},uAuraReveal:{value:1},uAuraMotion:{value:0},uAuraTurn:{value:0}, uResolution:{value:new THREE.Vector2(1,1)},uPortrait:{value:0},uPaper:{value:neutral},uPaperColor:{value:new THREE.Color("#f3f1f7")},uStrength:{value:1},uMode:{value:0},uFade:{value:1},uEffectVisibility:{value:1} },
     vertexShader:`void main(){gl_Position=vec4(position.xy,0.,1.);}`,
     fragmentShader: /* glsl */ `${paperShader} ${noise}
       uniform sampler2D uScene,uSoftScene; uniform float uStrength,uMode,uFade,uEffectVisibility,uPortrait,uTime;

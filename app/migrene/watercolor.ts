@@ -133,7 +133,7 @@ export function paintWatercolor(canvas: HTMLCanvasElement, foreground: boolean) 
   }
 }
 
-export function paintForegroundWatercolor(canvas: HTMLCanvasElement, coat = 0, paperColor = '#f8f5ef') {
+export function paintForegroundWatercolor(canvas: HTMLCanvasElement, coat = 0, paperColor = '#f3f1f7') {
   const context = canvas.getContext('2d');
   if (!context) return;
   canvas.width = 1800;

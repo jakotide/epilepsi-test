@@ -105,7 +105,7 @@ export default function ZoomSequence({ stageRef }: { stageRef: RefObject<HTMLDiv
       const veil = Math.sin(blend * Math.PI) * .16;
       if (veil > 0) {
         context.globalCompositeOperation = "source-atop";
-        context.fillStyle = `rgba(248, 245, 239, ${veil})`;
+        context.fillStyle = `rgba(243, 241, 247, ${veil})`;
         context.fillRect(0, 0, width, height);
         context.globalCompositeOperation = "source-over";
       }

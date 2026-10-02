@@ -20,7 +20,7 @@
   padding: 28px;
   opacity: var(--zoom-intro-opacity, 0);
   color: #43535c;
-  background: radial-gradient(ellipse 45% 32% at center, #f8f5efd9, #f8f5ef00);
+  background: radial-gradient(ellipse 45% 32% at center, #f3f1f7d9, #f3f1f700);
 }
 .textBox { width: min(100%, 510px); text-align: center; }
 .textBox h2 {
