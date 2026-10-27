@@ -8,6 +8,6 @@ export const STILL_LIFE_SCENES = [
   { orbit: "mug-close", angle: 0 },
   { orbit: "orbit", angle: 0 },
   { orbit: "open-book", angle: 0 },
-  { orbit: "orbit", angle: 75 },
+  { orbit: "cupcake", angle: 75 },
 ] as const;
 export type StillLifeComposition = (typeof STILL_LIFE_SCENES)[number]["orbit"];

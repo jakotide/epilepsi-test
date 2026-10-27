@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const variant = process.argv[2] || 'wide';
-if (!['wide', 'mug-close', 'open-book'].includes(variant)) throw Error('Unknown still-life composition');
+if (!['wide', 'mug-close', 'open-book', 'cupcake'].includes(variant)) throw Error('Unknown still-life composition');
 const asset = path.join(root, 'assets/still-life', variant === 'wide' ? '' : variant);
 const input = path.join(asset, 'renders');
 const output = path.join(root, 'public/models/still-life', variant === 'wide' ? 'orbit' : variant);

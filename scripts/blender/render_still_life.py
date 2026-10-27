@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 args = sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
 start, end = (int(args[0]), int(args[1])) if len(args) >= 2 else (0,72)
 variant = args[2] if len(args)>2 else 'wide'
-assert variant in ('wide','mug-close','open-book')
+assert variant in ('wide','mug-close','open-book','cupcake')
 ASSET = ROOT / 'assets/still-life'
 if variant!='wide':
     ASSET = ASSET / variant

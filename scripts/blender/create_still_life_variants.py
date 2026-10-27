@@ -2,6 +2,7 @@
 from pathlib import Path
 from math import sin, cos, pi, radians
 from random import Random
+from runpy import run_path
 import bpy
 from mathutils import Vector
 
@@ -210,10 +211,8 @@ for side in (-1,1):
             x += length+random.uniform(.045,.075)
 mesh('small scribbled text on both pages', vertices, faces, ink)
 
-vertices = [(-.045,-1.25,.21),(.045,-1.25,.21),(.07,-1.56,.12),(.14,-1.90,.025),
-            (.065,-1.84,.027),(.04,-1.93,.025),(-.025,-1.56,.12)]
-ribbon = mesh('open book ribbon', vertices, [(0,1,2,6),(6,2,3,4,5)], ribbon_material)
-ribbon.modifiers.new('Soft bookmark thickness','SOLIDIFY').thickness=.006
+bookmark = run_path(str(ROOT / 'scripts/blender/open_book_bookmark.py'))
+bookmark['add_bookmark'](scene, book, ribbon_material)
 aim(scene, (0,-11,12), (0,-.15,.5), 9.4)
 scene['notes'] = 'Open book in the foreground, curved cream pages and tiny graphite scribbles; mug and plate behind. Higher camera for reading the page shapes.'
 save(scene, 'open-book')

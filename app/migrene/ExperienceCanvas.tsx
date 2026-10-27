@@ -33,10 +33,11 @@ export default function ExperienceCanvas() {
     setSelected(index);
     engine.current?.select(index);
   };
+  const stillLifeSubjects = displayed === 3 ? "koppen, boken og tallerkenen med en cupcake" : "koppen, tallerkenen og boken";
   return (
     <section id="visuelle-uttrykk" className={styles.section} aria-label="Utforsk visuelle uttrykk" data-experience>
       <div className={styles.stage}>
-        <div ref={hostRef} className={styles.canvas} role="group" tabIndex={0} aria-label={!SHOW_BOTANICAL_SCENES ? "Dra sidelengs eller bruk piltastene for å rotere koppen, tallerkenen og boken 360 grader. Home tilbakestiller." : displayed === 2 ? "Dra sidelengs eller bruk piltastene for å rotere buketten 360 grader. Home tilbakestiller." : displayed === 0 ? "Dra sidelengs eller bruk piltastene for å rotere koppen 360 grader. Home tilbakestiller." : "Dra sidelengs eller bruk piltastene for å rotere skogen 360 grader. Home tilbakestiller."} data-experience-canvas />
+        <div ref={hostRef} className={styles.canvas} role="group" tabIndex={0} aria-label={!SHOW_BOTANICAL_SCENES ? `Dra sidelengs eller bruk piltastene for å rotere ${stillLifeSubjects} 360 grader. Home tilbakestiller.` : displayed === 2 ? "Dra sidelengs eller bruk piltastene for å rotere buketten 360 grader. Home tilbakestiller." : displayed === 0 ? "Dra sidelengs eller bruk piltastene for å rotere koppen 360 grader. Home tilbakestiller." : "Dra sidelengs eller bruk piltastene for å rotere skogen 360 grader. Home tilbakestiller."} data-experience-canvas />
         <div className={styles.panel}>
           <div className={styles.choices} role="group" aria-label="Velg et visuelt uttrykk">
             {studies.map((study, index) => (

@@ -6,13 +6,17 @@ material, with layered pigment, paper grain, and shared window lighting.
 
 `watercolor-still-life.blend` contains the wide composition. `mug-close/` and
 `open-book/` each contain an independent editable Blender scene and a preview.
+`cupcake/` adds a vanilla cupcake to the wide scene's plate, with pleated ochre
+paper and a continuous spiral of blush icing that covers the sponge down to
+the wrapper rim, using the same watercolor nodes.
 The close view uses a lower camera and tighter framing, with the mug in front.
 The open-book view uses a higher camera, curved pages with tiny graphite
-scribbles, and the mug and plate behind the book. All previews use the site's
+scribbles, a continuous rose ribbon that clears the cover edge, and the mug and
+plate behind the book. All previews use the site's
 `#f3f1f7` paper color. Original sources and rose/woodland website code are retained.
 
 Each composition has 72 transparent 960px WebP views at five-degree intervals
-in `public/models/still-life/`: `orbit/`, `mug-close/`, and `open-book/`.
+in `public/models/still-life/`: `orbit/`, `mug-close/`, `open-book/`, and `cupcake/`.
 The orbit cache keeps at most six textures per composition, plus in-flight
 decodes. During a transition only the current and incoming compositions are
 retained; the outgoing cache is disposed at the hidden swap. Only the nearest
@@ -22,7 +26,7 @@ Home resets the current effect's view. Automatic movement is restrained and
 pauses offscreen, in hidden tabs, and with reduced motion enabled.
 
 `STILL_LIFE_SCENES` assigns the mug close-up to Uskarpt, the original wide view
-to Lyspunkter, the open book to Aura, and an angled wide view to Slør.
+to Lyspunkter, the open book to Aura, and the angled cupcake view to Slør.
 On selection, the exact destination frame loads before the current scene fades
 to paper over 0.32 seconds. The new composition then fades in over 0.42 seconds.
 Reduced motion switches directly once ready. Rapid selections cancel obsolete
@@ -40,7 +44,8 @@ node scripts/blender/send-command.cjs scripts/blender/create_watercolor_still_li
 node scripts/pack-still-life.cjs
 
 node scripts/blender/send-command.cjs scripts/blender/create_still_life_variants.py
-foreach ($composition in @('mug-close', 'open-book')) {
+node scripts/blender/send-command.cjs scripts/blender/create_watercolor_cupcake.py
+foreach ($composition in @('mug-close', 'open-book', 'cupcake')) {
   & 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b "assets/still-life/$composition/watercolor-still-life.blend" -P scripts/blender/render_still_life.py -- 0 72 $composition
   node scripts/pack-still-life.cjs $composition
 }
