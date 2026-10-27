@@ -3,7 +3,8 @@ import gsap from "gsap";
 import { paperShader } from "./brain/paintedMaterial";
 import { createGroveLayers } from "./groveLayers";
 import { createPaintJourney } from "./paintJourney";
-import { createMugOrbit, createPaintedOrbit } from "./mugOrbit";
+import { createMugOrbit, createStillLifeOrbit, createPaintedOrbit } from "./mugOrbit";
+import { SHOW_BOTANICAL_SCENES, STILL_LIFE_SCENES } from "./experienceConfig";
 
 export type ExperienceScene = { select: (index: number) => void; setEffect: (enabled: boolean) => void; dispose: () => void };
 
@@ -39,8 +40,8 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(...position); group.add(mesh); return mesh;
   };
-  // Adjacent Blender angles preserve the rose shader as the actual mug turns.
-  // Blend premultiplied colors so transparent silhouettes stay clean.
+  // Still-life views use one frame; the retained original scenes can blend.
+  // Premultiplied colors keep their transparent silhouettes clean.
   const mugMaterial = new THREE.ShaderMaterial({
     transparent:true,depthWrite:false,toneMapped:false,
     uniforms:{uViewA:{value:null},uViewB:{value:null},uBlend:{value:0}},
@@ -232,6 +233,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   };
   let drag: { id:number; x:number; y:number; start:number; moved:boolean } | undefined;
   let transition: gsap.core.Timeline | undefined;
+  let incomingOrbit: ReturnType<typeof createStillLifeOrbit> | undefined;
   host.dataset.journey="idle";
   const positionWorld=()=>{
     const forest=travel.active&&travel.forest;
@@ -283,7 +285,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
       motionTime+=dt;
       pointer+=(pointerTarget-pointer)*(1.-Math.exp(-dt*3));
     }
-    if(bouquet.visible){
+    if(displayed===2){
       if(preference.matches){
         post.uniforms.uAuraReveal.value=1;
         post.uniforms.uAuraMotion.value=post.uniforms.uAuraTurn.value=0;
@@ -296,7 +298,9 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
           post.uniforms.uAuraReveal.value=Math.min(1,post.uniforms.uAuraReveal.value+dt/1.8);
       }
     }
-    const angle=mugAngle+travel.turn*2+(preference.matches||mugTouched?0:Math.sin(motionTime*.32)*5+pointer*2);
+    const heading=SHOW_BOTANICAL_SCENES?0:STILL_LIFE_SCENES[displayed].angle;
+    const sway=SHOW_BOTANICAL_SCENES?Math.sin(motionTime*.32)*5+pointer*2:Math.sin(motionTime*.32)*2+pointer*.75;
+    const angle=heading+mugAngle+travel.turn*2+(preference.matches||mugTouched?0:sway);
     if(mug.visible){
       const view=orbit.sample(angle);
       if(view){
@@ -338,7 +342,11 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
     host.dataset.loaded="true";
     host.dataset.effectStrength=post.uniforms.uStrength.value.toFixed(3);
     host.dataset.scene=String(displayed);
+    host.dataset.subject=SHOW_BOTANICAL_SCENES?(bouquet.visible?"bouquet":grove.visible?"grove":"mug"):"still-life";
+    host.dataset.composition=SHOW_BOTANICAL_SCENES?host.dataset.subject:STILL_LIFE_SCENES[displayed].orbit;
+    host.dataset.sceneOpacity=post.uniforms.uFade.value.toFixed(3);
     host.dataset.mugView=angle.toFixed(3);
+    host.dataset.viewBlend=mugMaterial.uniforms.uBlend.value.toFixed(3);
     host.dataset.mugFrames=String(orbit.size);
     host.dataset.bouquetAngle=bouquetAngle.toFixed(3);
     host.dataset.auraMotion=post.uniforms.uAuraMotion.value.toFixed(3);
@@ -380,6 +388,17 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
       else if(isGrove)group.position.addScaledVector(up,-.20);
       group.scale.setScalar(isGrove?(w<=700?.39:.70):group===bouquet?(w<=700?.64:1.05):(w<=700?.72:1.12));
     }
+    if(!SHOW_BOTANICAL_SCENES){
+      // Frame the whole arrangement with breathing room, including during a turn.
+      const distance=camera.position.distanceTo(new THREE.Vector3(0,.4,0));
+      const viewHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*distance;
+      const viewWidth=viewHeight*camera.aspect;
+      const availableWidth=viewWidth*(w<=700?.88:.58);
+      const scale=Math.min(w<=700?.65:.99,availableWidth/(5.6*.84));
+      mug.scale.setScalar(scale);
+      mug.position.copy(right).multiplyScalar(w<=700?0:-viewWidth*.17);
+      if(w<=700)mug.position.addScaledVector(up,viewHeight*.18);
+    }
     baseMug.copy(mug.position);baseGrove.copy(grove.position);
     travelLift=w<=700?.15:0;
     journey.uniforms.uPortrait.value=w<=700?1:0;
@@ -392,13 +411,13 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   const intersection=new IntersectionObserver(([entry])=>{
     visible=entry.isIntersecting;lastTime=0;
     transition?.paused(!visible||document.hidden);
-    if(visible)void groveLayers.load();
+    if(visible&&SHOW_BOTANICAL_SCENES)void groveLayers.load();
     requestDraw();
   });intersection.observe(host);
   host.dataset.mugLoaded="false";
-  const orbit=createMugOrbit(()=>{
+  let orbit=(SHOW_BOTANICAL_SCENES?createMugOrbit:createStillLifeOrbit)(()=>{
     host.dataset.mugLoaded="true";requestDraw();
-  },()=>{host.dataset.mugLoaded="error";onAssetError?.();});
+  },()=>{host.dataset.mugLoaded="error";onAssetError?.();},STILL_LIFE_SCENES[0].orbit);
   orbit.sample(0);
   host.dataset.bouquetLoaded="false";
   const bouquetOrbit=createPaintedOrbit(index=>`/models/bouquet/orbit-airy/view-${String(index).padStart(2,"0")}.webp`,()=>{
@@ -408,12 +427,19 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
     if(!alive){texture.dispose();return;}paper=texture;paper.colorSpace=THREE.SRGBColorSpace;paper.wrapS=paper.wrapT=THREE.MirroredRepeatWrapping;post.uniforms.uPaper.value=paper;requestDraw();
   });
   const showScene=(index:number)=>{
+    if(!SHOW_BOTANICAL_SCENES&&index!==displayed){
+      // Each effect opens at its own view, independent of the previous drag.
+      mugAngle=0;mugTouched=false;pointer=pointerTarget=0;motionTime=0;
+    }
     if(index===2&&displayed!==2){
       post.uniforms.uAuraReveal.value=preference.matches?1:0;
       post.uniforms.uAuraMotion.value=post.uniforms.uAuraTurn.value=0;
       auraImpulse=auraTurnTarget=0;
     }
-    displayed=index;mug.visible=index===0;bouquet.visible=index===2;grove.visible=index%2===1;
+    displayed=index;
+    mug.visible=!SHOW_BOTANICAL_SCENES||index===0;
+    bouquet.visible=SHOW_BOTANICAL_SCENES&&index===2;
+    grove.visible=SHOW_BOTANICAL_SCENES&&index%2===1;
     post.uniforms.uMode.value=index;onSceneVisible?.(index);
   };
   const settle=(index:number)=>{
@@ -429,7 +455,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
         drag.moved=true;host.setPointerCapture(event.pointerId);host.dataset.dragging="true";
       }
       if(drag.moved){
-        if(mug.visible){mugTouched=true;mugAngle=drag.start+dx/host.clientWidth*360;}
+        if(mug.visible){mugTouched=true;mugAngle=drag.start+dx/host.clientWidth*360;if(displayed===2)turnBouquet(mugAngle);}
         else if(bouquet.visible)turnBouquet(drag.start+dx/host.clientWidth*360);
         else groveAngle=drag.start+dx/host.clientWidth*360;
         requestDraw();
@@ -442,7 +468,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
     requestDraw();
   };
   const onDown=(event:PointerEvent)=>{
-    if(travel.active||!event.isPrimary||event.button!==0)return;
+    if(travel.active||post.uniforms.uFade.value<.999||!event.isPrimary||event.button!==0)return;
     host.focus({preventScroll:true});
     drag={id:event.pointerId,x:event.clientX,y:event.clientY,start:grove.visible?groveAngle:bouquet.visible?bouquetAngle:mugAngle,moved:false};
   };
@@ -454,10 +480,10 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   // the host emits a bubbling loss event from that child, not the end of a drag.
   const onLostCapture=(event:PointerEvent)=>{if(event.target===host)endDrag();};
   const onKey=(event:KeyboardEvent)=>{
-    if(travel.active||!["ArrowLeft","ArrowRight","Home"].includes(event.key))return;
+    if(travel.active||post.uniforms.uFade.value<.999||!["ArrowLeft","ArrowRight","Home"].includes(event.key))return;
     event.preventDefault();
     const step=event.key==="ArrowLeft"?-1:1;
-    if(mug.visible){mugTouched=true;mugAngle=event.key==="Home"?0:mugAngle+step*15;}
+    if(mug.visible){mugTouched=true;mugAngle=event.key==="Home"?0:mugAngle+step*15;if(displayed===2)turnBouquet(mugAngle);}
     else if(bouquet.visible)turnBouquet(event.key==="Home"?0:bouquetAngle+step*15);
     else groveAngle=event.key==="Home"?0:groveAngle+step*15;
     requestDraw();
@@ -466,6 +492,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   const onPreference=()=>{
     pointer=pointerTarget=0;lastTime=0;
     auraImpulse=auraTurnTarget=0;
+    if(!SHOW_BOTANICAL_SCENES&&preference.matches)transition?.progress(1);
     if(preference.matches&&travel.active){
       transition?.kill();settle(displayed);select(selection);
     }
@@ -477,8 +504,40 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
   host.addEventListener("keydown",onKey);
   preference.addEventListener("change",onPreference);
   const select=(index:number)=>{
+    if(!Number.isInteger(index)||index<0||index>3)return;
     endDrag();
     selection=index;
+    if(!SHOW_BOTANICAL_SCENES){
+      const version=++selectionVersion;
+      transition?.kill();transition=undefined;
+      incomingOrbit?.dispose();incomingOrbit=undefined;
+      const fadeIn=()=>{
+        transition=gsap.timeline({onUpdate:requestDraw,onComplete:()=>{host.dataset.journey="idle";}})
+          .to(post.uniforms.uFade,{value:1,duration:preference.matches?0:.42,ease:"power1.inOut"});
+        transition.paused(!visible||document.hidden);requestDraw();
+      };
+      if(index===displayed){fadeIn();return;}
+      host.dataset.journey="loading";
+      const next=createStillLifeOrbit(requestDraw,()=>{if(alive&&version===selectionVersion)onAssetError?.();},STILL_LIFE_SCENES[index].orbit);
+      incomingOrbit=next;
+      // Keep the current painting visible while the exact destination view loads.
+      void next.prepare(STILL_LIFE_SCENES[index].angle).then(ready=>{
+        if(!alive||version!==selectionVersion)return;
+        if(!ready){next.dispose();incomingOrbit=undefined;fadeIn();return;}
+        host.dataset.journey="fade-out";
+        transition=gsap.timeline({onUpdate:requestDraw,onComplete:()=>{host.dataset.journey="idle";}})
+          .to(post.uniforms.uFade,{value:0,duration:preference.matches?0:.32,ease:"power1.inOut"})
+          .call(()=>{
+            orbit.dispose();orbit=next;incomingOrbit=undefined;
+            showScene(index);mugPainting.visible=false;
+            host.dataset.mugLoaded="true";
+            host.dataset.journey="fade-in";
+          })
+          .to(post.uniforms.uFade,{value:1,duration:preference.matches?0:.42,ease:"power1.inOut"});
+        transition.paused(!visible||document.hidden);requestDraw();
+      });
+      return;
+    }
     // Begin loading even when this selection is queued during another journey.
     if(index===2)void bouquetOrbit.load();
     // Keep the current journey continuous; the midpoint takes the latest choice.
@@ -541,7 +600,7 @@ export function createExperienceScene(host: HTMLDivElement, onAssetError?: () =>
     if(enabled&&displayed===2)post.uniforms.uAuraReveal.value=preference.matches?1:0;
     gsap.to(post.uniforms.uStrength,{value:enabled?1:0,duration:preference.matches?0:.45,overwrite:true,onUpdate:requestDraw});
   },dispose(){
-    alive=false;cancelAnimationFrame(frame);transition?.kill();gsap.killTweensOf(post.uniforms.uStrength);
+    alive=false;cancelAnimationFrame(frame);transition?.kill();incomingOrbit?.dispose();gsap.killTweensOf(post.uniforms.uStrength);
     observer.disconnect();intersection.disconnect();document.removeEventListener("visibilitychange",onVisibility);
     host.removeEventListener("pointermove",onPointer);host.removeEventListener("pointerleave",onLeave);preference.removeEventListener("change",onPreference);
     endDrag();host.removeEventListener("pointerdown",onDown);host.removeEventListener("pointerup",endDrag);

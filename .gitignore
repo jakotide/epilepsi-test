@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Reproducible Blender still-life render passes (web assets are tracked)
+/assets/still-life/renders/
+/assets/still-life/*.blend1
+/assets/still-life/**/renders/
+/assets/still-life/**/*.blend1
